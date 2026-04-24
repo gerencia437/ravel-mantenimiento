@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Transporte Ravel — Mantenimiento</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1916;min-height:100vh}
+  .app{max-width:720px;margin:0 auto;padding:16px}
+  .header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .logo{width:36px;height:36px;border-radius:50%;background:#0F6E56;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;flex-shrink:0}
+  .header-text h1{font-size:14px;font-weight:600}
+  .header-text p{font-size:11px;color:#888}
+  .nav{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:18px}
+  .nav button{padding:6px 12px;font-size:12px;border-radius:6px;cursor:pointer;border:0.5px solid #ddd;background:#f5f5f0;color:#666;font-weight:400;transition:all 0.15s}
+  .nav button.active{background:#0F6E56;color:#fff;border-color:#0F6E56;font-weight:500}
+  .card{background:#fff;border:0.5px solid #e5e5e0;border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .card-header{padding:10px 14px;border-bottom:0.5px solid #e5e5e0;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center}
+  .row{padding:10px 14px;border-bottom:0.5px solid #e5e5e0;display:flex;align-items:center;gap:10px}
+  .row:last-child{border-bottom:none}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .badge{font-size:11px;padding:2px 8px;border-radius:5px;font-weight:500;white-space:nowrap}
+  .badge.rojo{background:#FCEBEB;color:#A32D2D}
+  .badge.amarillo{background:#FAEEDA;color:#BA7517}
+  .badge.verde{background:#EAF3DE;color:#3B6D11}
+  .badge.gris{background:#f0ede8;color:#666}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{background:#f5f5f0;border-radius:8px;padding:10px 12px;cursor:pointer;border:1px solid transparent;transition:all 0.15s}
+  .kpi.selected{border-color:currentColor}
+  .kpi label{font-size:11px;color:#888;display:block;margin-bottom:3px}
+  .kpi span{font-size:24px;font-weight:600}
+  input,select,textarea{width:100%;padding:7px 10px;font-size:13px;border-radius:6px;border:0.5px solid #ddd;background:#fff;color:#1a1916;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#0F6E56}
+  .btn{padding:8px 20px;background:#0F6E56;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500}
+  .btn:hover{background:#0a5a46}
+  .btn-sm{padding:5px 12px;font-size:12px}
+  .btn-green{background:#25D366}
+  .empty{padding:20px;text-align:center;font-size:13px;color:#888}
+  .loading{text-align:center;padding:30px;color:#888;font-size:13px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0F6E56;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:1000;display:none}
+  .toast.show{display:block}
+  .tag{font-size:11px;padding:1px 7px;border-radius:4px}
+  .tag.prev{background:#EAF3DE;color:#3B6D11}
+  .tag.corr{background:#FCEBEB;color:#A32D2D}
+  .tag.pred{background:#E6F1FB;color:#185FA5}
+  .section-title{font-size:13px;font-weight:500;margin-bottom:12px;color:#1a1916}
+  .bar-wrap{background:#f0ede8;border-radius:4px;height:6px;overflow:hidden;margin-top:4px}
+  .bar{height:100%;background:#0F6E56;border-radius:4px}
+  .hidden{display:none}
+  .alert-box{background:#FCEBEB;border:1px solid #A32D2D;border-radius:8px;padding:12px 14px;margin-bottom:14px}
+  .alert-box .title{font-size:13px;font-weight:500;color:#A32D2D;margin-bottom:8px}
+  .alert-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid #f7c1c1}
+  .alert-row:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">TR</div>
+    <div class="header-text">
+      <h1>Transporte Ravel — Mantenimiento</h1>
+      <p id="subtitulo">Cargando...</p>
+    </div>
+  </div>
+  <div class="nav" id="nav"></div>
+  <div id="content"><div class="loading">Cargando datos...</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAmfFabMCKEDvZNdpIYA_HpIMAurpT_izg",
+  authDomain: "transporte-ravel.firebaseapp.com",
+  projectId: "transporte-ravel",
+  storageBucket: "transporte-ravel.firebasestorage.app",
+  messagingSenderId: "349820780179",
+  appId: "1:349820780179:web:e330d14a09d44f63019766"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ── Datos maestros ──
+const INT_BUS = {motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
+const INT_NPR_EXU = {motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_NPR_NNM = {motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_URVAN = {motor:7000,caja:40000,transmision:40000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_NV350 = {motor:7000,caja:30000,transmision:30000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_MASTER = {motor:10000,caja:60000,transmision:60000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_DUSTER = {motor:10000,caja:80000,transmision:80000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+
+const VEHICULOS_SEED = [
+  {placa:"EQX014",conductor:"Nixon",cel:"300 7216367",tipo:"Bus",marca:"Chevrolet FRR",modelo:2018,km:377982,int:INT_BUS},
+  {placa:"EQX672",conductor:"Sergio Restrepo",cel:"313 6549284",tipo:"Bus",marca:"Chevrolet FRR",modelo:2018,km:429872,int:INT_BUS},
+  {placa:"GDX595",conductor:"Alexander Leguizamón",cel:"320 4025037",tipo:"Bus",marca:"Chevrolet FRR",modelo:2020,km:348185,int:INT_BUS},
+  {placa:"SNQ413",conductor:"Luis Fernando",cel:"310 6364707",tipo:"Bus",marca:"Chevrolet FRR",modelo:2012,km:841785,int:INT_BUS},
+  {placa:"WMO864",conductor:"Alex Barrantes",cel:"300 4576838",tipo:"Bus",marca:"Chevrolet FRR",modelo:2016,km:528039,int:INT_BUS},
+  {placa:"EQX102",conductor:"Alejandro Escobar",cel:"311 6132943",tipo:"Bus",marca:"Chevrolet FRR",modelo:2019,km:404203,int:INT_BUS},
+  {placa:"EQX104",conductor:"Simón Zapata",cel:"315 3462684",tipo:"Bus",marca:"Chevrolet FRR",modelo:2019,km:414666,int:INT_BUS},
+  {placa:"EQX103",conductor:"Daniel Castellanos",cel:"301 6707871",tipo:"Bus",marca:"Chevrolet FRR",modelo:2020,km:427830,int:INT_BUS},
+  {placa:"TLY677",conductor:"Cristian",cel:"311 3647375",tipo:"Bus",marca:"Hino 500",modelo:2014,km:549154,int:INT_BUS},
+  {placa:"NNM607",conductor:"Yeison",cel:"302 3970585",tipo:"Buseta",marca:"Chevrolet NPR",modelo:2025,km:64589,int:INT_NPR_NNM},
+  {placa:"EXU474",conductor:"Carlos",cel:"301 9046054",tipo:"Buseta",marca:"Chevrolet NPR",modelo:2025,km:337043,int:INT_NPR_EXU},
+  {placa:"SPN195",conductor:"Juan Camilo",cel:"300 3338087",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2011,km:401497,int:INT_URVAN},
+  {placa:"STW467",conductor:"Henry",cel:"301 6428852",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2012,km:465572,int:INT_URVAN},
+  {placa:"STY707",conductor:"Juan Felipe",cel:"310 6951940",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2012,km:551061,int:INT_URVAN},
+  {placa:"SXY558",conductor:"Wilmer",cel:"315 6436693",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2011,km:388443,int:INT_URVAN},
+  {placa:"SNO578",conductor:"Diego Muñoz",cel:"—",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2008,km:580900,int:INT_URVAN},
+  {placa:"SNS287",conductor:"Nolberto",cel:"321 6577340",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2012,km:522053,int:INT_URVAN},
+  {placa:"TTX964",conductor:"Jesús Hernández / Walter",cel:"302 3854633",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2013,km:483818,int:INT_URVAN},
+  {placa:"WEQ534",conductor:"Jhon Mauricio",cel:"—",tipo:"Microbus",marca:"Nissan Urvan NV350",modelo:2014,km:337200,int:INT_NV350},
+  {placa:"WGO340",conductor:"Jeferson",cel:"350 3048656",tipo:"Microbus",marca:"Nissan Urvan NV350",modelo:2013,km:327459,int:INT_NV350},
+  {placa:"WCP663",conductor:"Felipe",cel:"318 2416849",tipo:"Microbus",marca:"Nissan Urvan NV350",modelo:2015,km:335958,int:INT_NV350},
+  {placa:"TSI304",conductor:"Pendiente",cel:"—",tipo:"Microbus",marca:"Nissan Urvan 3000",modelo:2008,km:374155,int:INT_URVAN},
+  {placa:"GDX162",conductor:"Mateo",cel:"350 8281524",tipo:"Microbus",marca:"New Master",modelo:2020,km:291545,int:INT_MASTER},
+  {placa:"JYM994",conductor:"Nilton Gaviria",cel:"311 3073869",tipo:"Microbus",marca:"New Master",modelo:2021,km:288513,int:INT_MASTER},
+  {placa:"JYN602",conductor:"Sebastián Sánchez",cel:"350 2300509",tipo:"Microbus",marca:"New Master",modelo:2020,km:308704,int:INT_MASTER},
+  {placa:"SNZ317",conductor:"Daniel",cel:"301 4525144",tipo:"Microbus",marca:"New Master",modelo:2018,km:360904,int:INT_MASTER},
+  {placa:"LKL364",conductor:"Wilson",cel:"324 5923086",tipo:"Campero",marca:"Renault Duster",modelo:2023,km:100377,int:INT_DUSTER},
+  {placa:"NNM812",conductor:"Carlos Gómez",cel:"321 7532281",tipo:"Camioneta DC",marca:"Renault Duster Oroch",modelo:2025,km:62859,int:INT_DUSTER},
+];
+
+const LABELS = {motor:"Aceite motor + correas y líneas turbo",caja:"Aceite caja",transmision:"Transmisión",frenos:"Frenos",engrase:"Engrase / muelles",alternador:"Alternador",correa:"Correa AA / Alternador",alineacion:"Alineación / Rotación",liqFrenos:"Líquido de frenos",liqEmbrague:"Líquido de embrague",aceiteDireccion:"Aceite de dirección",refrigerante:"Refrigerante motor",calibValvulas:"Calibración de válvulas"};
+const ITEMS_BASE = Object.entries(LABELS).map(([k,l])=>({key:k,label:l}));
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const TALLERES_SEED = ["A.R VIDRIOS AUTOMOTRIZ","ALEXANDER MEJIA (EL NIÑO)","ANIBAL RADIADORES","AUTOS EL REY","AUTOLARTE","BENDY REPUESTOS","CARHAUS AUTOMOTRIZ SAS","CARIBE MOTOR","CARROCERO","CASTRO TORO JHON DAYRO","CHALO AVISOS SAS","CHAMPION SAS","CM AUTOPARTES","DANER ARNETH LOPEZ","DARWIN GIOVANY AGUDELO","DANIEL BOMBA URVAN","DIEGO TRUJILLO","DIESEL AMBIENTAL","DIESEL ANDINO","DISTRIBUIDORA NISSAN","DIRECCIONES BUFALO","DZ ELECTRICO","EURIPIDES","EJES Y RADIADORES DEL NORTE","EL TRAPICHE","ELECTRILAGOS","FENIX","FIBRAS ESCUDERO SAS","FRENOS AYURA","FRENOS Y AIRES MEDELLIN","FRENOS FALCIONI","GALVIS BORRERO JULIO","GIOVANY DELGADO","GENERACION DIESEL","GLOBAL PARTES","GRUAXEPRESS","GUAYAS EL ABUELO","HELICOIL","HERNANDO JOSE BENITEZ","INVERSIONES LOTERO PELAEZ","JHONY ALEXANDER GARCIA","JULIO CESAR GALVIS","JUAN CARLOS MORENO","LABORATORIO JJ DIESEL","LABORATORIO REPARDIESEL","LALO COMPRESORES","LA CASA DEL EMBRAGUE","LODARYS TORRES","LOS PRIMOS","LUJOS EL TRAPICHE","MUELLES CART","MUNDO LUJOS","NATALUJOS IRMA NATALIA","NANO FRENOS","NIPON PARTES","NISSAN Y CAMPEROS","ODMEL S.A.S","OLMED VIGIAS","ORIENTAL DE VIDRIOS","PABLO GOMEZ FRENOS","PACHO DIESEL","PETETE","PROPARTES","RAMO ELECTRICOS","RICARDO PALOMARES","REAL VIDRIOS","RECTIFICADORA JOAR","REPUESTOS Y SERVICIOS D&J SAS","RYH REPUESTOS","SERVIREENCAUCHE DE COLOMBIA SA","SERVITECA LISTO","SEA ITAGUI","SOLO TURBOS","SOLO FRENOS (PETETE)","TALLER INDUSTRIAL LA MACARENA","TALLER LOS PRIMOS","TALLER LUCHO","TALLER RAVEL","TALLER SANCAR","TALLER PROPIO","TAVO FRENOS","TAXIMTEROS EL CHUPA","TECNICENTRO LOS COLORES","VIVIANA MARITZA-NANO","WILLIAN ELECTRICO GUARNE","WILSON RUIZ","WILDER MAURICIO MENDOZA","YOMANALBEIRO","YUBERNEY TAMAYO","YULI CINTURONES","ZULED","ZULUAGA BERRIO SARAH","PUNTO LUJOS"];
+
+// ── Estado global ──
+let VIEW = "Alertas";
+let vehiculos = [];
+let registros = [];
+let kmBase = {};
+let talleres = [...TALLERES_SEED];
+let alertFiltro = "todos";
+let histPlaca = "";
+let mesInf = new Date().getMonth();
+let conductoresData = [];
+
+const NAVS = ["Alertas","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
+
+// ── Utilidades ──
+const $ = id => document.getElementById(id);
+const fmt = n => n?.toLocaleString('es-CO') ?? '—';
+const money = n => n > 0 ? '$'+fmt(n) : '—';
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function getProximo(v, k) {
+  const base = kmBase[v.placa]?.[k];
+  if (base !== undefined && base !== '') return parseInt(base) + v.int[k];
+  if (!v.km || !v.int[k]) return null;
+  return Math.floor(v.km / v.int[k]) * v.int[k] + v.int[k];
+}
+
+function getFaltante(v, k) {
+  if (!v.km || !v.int[k]) return null;
+  const p = getProximo(v, k);
+  return p ? p - v.km : null;
+}
+
+function estadoBadge(f) {
+  if (f === null) return 'gris';
+  if (f <= 0) return 'rojo';
+  if (f <= 1500) return 'amarillo';
+  return 'verde';
+}
+
+function dotColor(est) {
+  return {rojo:'#A32D2D',amarillo:'#BA7517',verde:'#3B6D11',gris:'#999'}[est] || '#999';
+}
+
+// ── Firebase helpers ──
+async function initData() {
+  // Vehiculos
+  const vSnap = await getDocs(collection(db, 'vehiculos'));
+  if (vSnap.empty) {
+    for (const v of VEHICULOS_SEED) {
+      await setDoc(doc(db, 'vehiculos', v.placa), v);
+    }
+    vehiculos = VEHICULOS_SEED.map(v => ({...v}));
+  } else {
+    vehiculos = vSnap.docs.map(d => {
+      const data = d.data();
+      const seed = VEHICULOS_SEED.find(v => v.placa === d.id);
+      return { ...seed, ...data, int: seed?.int || data.int };
+    });
+  }
+
+  // KmBase
+  const kSnap = await getDocs(collection(db, 'kmBase'));
+  kSnap.forEach(d => { kmBase[d.id] = d.data(); });
+
+  // Registros
+  const rSnap = await getDocs(query(collection(db, 'registros'), orderBy('fecha', 'desc')));
+  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Talleres
+  const tSnap = await getDoc(doc(db, 'config', 'talleres'));
+  if (tSnap.exists()) talleres = tSnap.data().lista;
+
+  // Conductores
+  conductoresData = vehiculos.map(v => ({
+    placa: v.placa, conductor: v.conductor, cel: v.cel,
+    desde: '2026-01-01', historial: []
+  }));
+
+  histPlaca = vehiculos[0]?.placa || '';
+  document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · Control preventivo 2026`;
+  renderNav();
+  renderView();
+}
+
+async function saveVehiculo(placa, data) {
+  const idx = vehiculos.findIndex(v => v.placa === placa);
+  if (idx >= 0) { vehiculos[idx] = { ...vehiculos[idx], ...data }; }
+  const { int, ...rest } = vehiculos[idx];
+  await setDoc(doc(db, 'vehiculos', placa), { ...rest }, { merge: true });
+}
+
+async function saveKmBase(placa, data) {
+  if (!kmBase[placa]) kmBase[placa] = {};
+  kmBase[placa] = { ...kmBase[placa], ...data };
+  await setDoc(doc(db, 'kmBase', placa), kmBase[placa]);
+}
+
+async function addRegistro(reg) {
+  const ref = await addDoc(collection(db, 'registros'), reg);
+  registros.unshift({ id: ref.id, ...reg });
+}
+
+async function saveTalleres() {
+  await setDoc(doc(db, 'config', 'talleres'), { lista: talleres });
+}
+
+// ── Render ──
+function renderNav() {
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAVS.map(n =>
+    `<button class="${VIEW===n?'active':''}" onclick="setView('${n}')">${n}</button>`
+  ).join('');
+}
+
+function renderView() {
+  const c = document.getElementById('content');
+  if (VIEW === 'Alertas') c.innerHTML = renderAlertas();
+  else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
+  else if (VIEW === 'Km base') c.innerHTML = renderKmBase();
+  else if (VIEW === 'Registro') c.innerHTML = renderRegistro();
+  else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
+  else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
+  else if (VIEW === 'Conductores') c.innerHTML = renderConductores();
+  bindEvents();
+}
+
+window.setView = function(v) { VIEW = v; renderNav(); renderView(); }
+
+// ── ALERTAS ──
+function renderAlertas() {
+  const alertas = [];
+  vehiculos.forEach(v => {
+    if (!v.km) return;
+    Object.keys(LABELS).forEach(k => {
+      if (!v.int[k]) return;
+      const f = getFaltante(v, k);
+      const est = estadoBadge(f);
+      if (alertFiltro === 'todos' || alertFiltro === est)
+        alertas.push({ placa: v.placa, conductor: v.conductor, item: LABELS[k], faltante: f, proximo: getProximo(v, k), estado: est });
+    });
+  });
+  alertas.sort((a, b) => (a.faltante ?? 99999) - (b.faltante ?? 99999));
+
+  const rojos = alertas.filter(a => a.estado === 'rojo').length;
+  const amarillos = alertas.filter(a => a.estado === 'amarillo').length;
+  const verdes = alertas.filter(a => a.estado === 'verde').length;
+  const sinKm = vehiculos.filter(v => !v.km).length;
+
+  const kpis = [
+    {l:'Críticos',v:rojos,c:'#A32D2D',bg:'#FCEBEB',k:'rojo'},
+    {l:'Próximos',v:amarillos,c:'#BA7517',bg:'#FAEEDA',k:'amarillo'},
+    {l:'Al día',v:verdes,c:'#3B6D11',bg:'#EAF3DE',k:'verde'},
+    {l:'Sin km',v:sinKm,c:'#185FA5',bg:'#E6F1FB',k:'sin'},
+  ];
+
+  return `
+  <div class="grid-4">
+    ${kpis.map(k => `
+      <div class="kpi ${alertFiltro===k.k?'selected':''}" style="background:${alertFiltro===k.k?k.bg:'#f5f5f0'};color:${k.c}" onclick="filtrarAlerta('${k.k}')">
+        <label>${k.l}</label>
+        <span>${k.v}</span>
+      </div>`).join('')}
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <select id="kmPlaca" style="flex:1"><option value="">Actualizar km de vehículo...</option>${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.km?fmt(v.km)+' km':'sin km'}</option>`).join('')}</select>
+    <input type="number" id="kmNuevo" placeholder="Km nuevo" style="width:130px"/>
+    <button class="btn btn-sm" onclick="actualizarKm()">Actualizar</button>
+  </div>
+  <div class="card">
+    <div class="card-header"><span>Alertas por kilometraje</span><span style="font-size:11px;color:#888">${alertas.length} ítems</span></div>
+    ${alertas.length === 0 ? '<div class="empty">No hay alertas en este filtro</div>' :
+      alertas.map(a => `
+        <div class="row">
+          <div class="dot" style="background:${dotColor(a.estado)}"></div>
+          <div style="font-weight:500;font-size:13px;min-width:72px">${a.placa}</div>
+          <div style="font-size:12px;color:#888;flex:1">${a.item}</div>
+          <div style="font-size:11px;color:#888;min-width:100px;text-align:right">Próximo: ${fmt(a.proximo)} km</div>
+          <div class="badge ${a.estado}" style="min-width:110px;text-align:center">
+            ${a.faltante <= 0 ? 'Vencido '+fmt(Math.abs(a.faltante))+' km' : 'Faltan '+fmt(a.faltante)+' km'}
+          </div>
+        </div>`).join('')}
+  </div>
+  ${sinKm > 0 ? `<div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;font-size:12px;color:#185FA5">Sin km: ${vehiculos.filter(v=>!v.km).map(v=>v.placa).join(', ')}</div>` : ''}`;
+}
+
+window.filtrarAlerta = function(k) {
+  alertFiltro = alertFiltro === k ? 'todos' : k;
+  renderView();
+}
+
+window.actualizarKm = async function() {
+  const placa = $('kmPlaca').value;
+  const km = parseInt($('kmNuevo').value);
+  if (!placa || !km) return;
+  await saveVehiculo(placa, { km });
+  toast('Km actualizado');
+  renderView();
+}
+
+// ── IMPORTAR KM ──
+function renderImportar() {
+  return `
+  <div style="font-size:13px;color:#888;margin-bottom:14px">Sube el reporte de preoperacionales (.txt o .csv) para actualizar todos los km de la flota.</div>
+  <label style="display:block;border:1.5px dashed #ddd;border-radius:10px;padding:28px 20px;text-align:center;cursor:pointer;margin-bottom:14px;background:#f5f5f0">
+    <div style="font-size:28px;margin-bottom:8px">📊</div>
+    <div style="font-size:13px;font-weight:500;margin-bottom:4px">Toca aquí para subir el reporte</div>
+    <div style="font-size:12px;color:#888">Archivos .txt o .csv — columnas Placa y Kilometraje</div>
+    <input type="file" accept=".txt,.csv" style="display:none" onchange="procesarImport(event)"/>
+  </label>
+  <div id="importResult"></div>`;
+}
+
+window.procesarImport = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const text = ev.target.result;
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { $('importResult').innerHTML = '<div style="color:red;padding:10px">Archivo sin datos</div>'; return; }
+    const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+    const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/['"]/g,''));
+    const pi = Math.max(0, headers.findIndex(h => h.includes('placa')));
+    const ki = Math.max(1, headers.findIndex(h => h.includes('km') || h.includes('kilometr')));
+    const rows = lines.slice(1).map(l => {
+      const cols = l.split(sep).map(c => c.trim().replace(/['"]/g,''));
+      return { placa: (cols[pi]||'').toUpperCase().replace(/\s/g,''), km: parseInt((cols[ki]||'').replace(/[^0-9]/g,''))||0 };
+    }).filter(r => r.placa && r.km > 0 && r.km < 9999999);
+
+    const enFlota = rows.filter(r => vehiculos.find(v => v.placa === r.placa));
+    const noFlota = rows.filter(r => !vehiculos.find(v => v.placa === r.placa));
+    const actualizan = enFlota.filter(r => { const v = vehiculos.find(x => x.placa === r.placa); return r.km > (v?.km||0); });
+    const noPlacas = vehiculos.filter(v => !enFlota.find(r => r.placa === v.placa));
+
+    $('importResult').innerHTML = `
+      <div class="grid-4" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="kpi"><label>Se actualizarán</label><span style="color:#3B6D11">${actualizan.length}</span></div>
+        <div class="kpi"><label>Sin cambio</label><span style="color:#BA7517">${enFlota.length - actualizan.length}</span></div>
+        <div class="kpi"><label>No en flota</label><span style="color:#888">${noFlota.length}</span></div>
+      </div>
+      ${noPlacas.length > 0 ? `
+      <div class="alert-box">
+        <div class="title">⚠️ ${noPlacas.length} vehículos sin preoperacional</div>
+        ${noPlacas.map(v => `<div class="alert-row"><span style="font-weight:500;color:#A32D2D">${v.placa} — ${v.conductor}</span><span style="font-size:11px;color:#A32D2D">${v.cel}</span></div>`).join('')}
+      </div>` : ''}
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-header">Vista previa — flota Ravel</div>
+        ${enFlota.map(r => {
+          const v = vehiculos.find(x => x.placa === r.placa);
+          const sube = r.km > (v?.km||0);
+          return `<div class="row">
+            <div class="dot" style="background:${sube?'#3B6D11':'#BA7517'}"></div>
+            <div style="font-weight:500;font-size:13px;min-width:72px">${r.placa}</div>
+            <div style="font-size:12px;color:#888;flex:1">Actual: ${fmt(v?.km||0)} → <strong>${fmt(r.km)} km</strong></div>
+            <div style="font-size:12px;font-weight:500;color:${sube?'#3B6D11':'#BA7517'}">${sube?'+'+fmt(r.km-(v?.km||0))+' km':'Sin cambio'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <button class="btn" style="width:100%" onclick="aplicarImport(${JSON.stringify(actualizan)})">Aplicar ${actualizan.length} actualizaciones</button>`;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+window.aplicarImport = async function(rows) {
+  for (const r of rows) {
+    await saveVehiculo(r.placa, { km: r.km });
+  }
+  toast('Kilometrajes actualizados');
+  renderView();
+}
+
+// ── KM BASE ──
+function renderKmBase() {
+  const btns = vehiculos.map(v => `<button class="nav" style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${histPlaca===v.placa?'#0F6E56':'#f5f5f0'};color:${histPlaca===v.placa?'#fff':'#666'}" onclick="selKmBase('${v.placa}')">${v.placa}</button>`).join('');
+  const v = vehiculos.find(x => x.placa === histPlaca);
+  if (!v) return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>`;
+  const base = kmBase[v.placa] || {};
+
+  const rows = Object.keys(LABELS).map(k => {
+    if (!v.int[k]) return '';
+    const bv = base[k] !== undefined ? base[k] : '';
+    const prox = bv !== '' ? parseInt(bv) + v.int[k] : (v.km ? Math.floor(v.km/v.int[k])*v.int[k]+v.int[k] : null);
+    const falt = prox && v.km ? prox - v.km : null;
+    const est = estadoBadge(falt);
+    return `<div class="row" style="align-items:center">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${LABELS[k]}</div>
+        <div style="font-size:11px;color:#888">Cada ${fmt(v.int[k])} km</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+        <input type="number" placeholder="Km último mant." value="${bv}" data-key="${k}" class="kmbase-input" style="width:160px;text-align:right" onchange="updateKmBaseField('${v.placa}','${k}',this.value)"/>
+        ${prox && v.km ? `<div class="badge ${est}">${falt<=0?'Vencido '+fmt(Math.abs(falt))+' km':'Faltan '+fmt(falt)+' km'}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div style="font-size:13px;color:#888;margin-bottom:12px">Ingresa el km del último mantenimiento por vehículo. Se guarda automáticamente.</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>
+  <div class="card">
+    <div class="card-header"><span>${v.placa} — ${v.marca} ${v.modelo}</span><span style="font-size:12px;color:#888">Km actual: ${v.km?fmt(v.km)+' km':'sin km'}</span></div>
+    ${rows}
+  </div>`;
+}
+
+window.selKmBase = function(p) { histPlaca = p; renderView(); }
+
+window.updateKmBaseField = async function(placa, k, val) {
+  await saveKmBase(placa, { [k]: val ? parseInt(val) : '' });
+  toast('Guardado');
+}
+
+// ── REGISTRO ──
+function renderRegistro() {
+  const ultimos = registros.slice(0, 8);
+  return `
+  <div class="card">
+    <div class="card-header">Nuevo registro de mantenimiento</div>
+    <div style="padding:14px">
+      <div class="grid-2" style="gap:10px;margin-bottom:10px">
+        <select id="rPlaca" onchange="autoFillConductor()">
+          <option value="">Seleccionar vehículo</option>
+          ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.tipo} ${v.marca}</option>`).join('')}
+        </select>
+        <input type="date" id="rFecha"/>
+        <select id="rTipo">
+          <option value="">Tipo de mantenimiento</option>
+          <option>Preventivo</option><option>Correctivo</option><option>Predictivo</option>
+        </select>
+        <input id="rConductor" placeholder="Conductor"/>
+        <div style="grid-column:1/-1">
+          <select id="rItem" onchange="onItemChange()">
+            <option value="">¿Qué mantenimiento se realizó?</option>
+            ${ITEMS_BASE.map(i=>`<option value="${i.key}">${i.label}</option>`).join('')}
+            <option value="__otro__">Otro (ingresar manualmente)</option>
+          </select>
+        </div>
+        <div id="rOtroWrap" style="grid-column:1/-1;display:none">
+          <input id="rOtro" placeholder="Describe el mantenimiento"/>
+        </div>
+        <div id="rItemMsg" style="grid-column:1/-1;background:#EAF3DE;border-radius:6px;padding:8px 12px;font-size:12px;color:#3B6D11;display:none"></div>
+        <input type="number" id="rKm" placeholder="Km al momento"/>
+        <input type="number" id="rCosto" placeholder="Costo ($)"/>
+        <div style="grid-column:1/-1">
+          <select id="rTaller">
+            <option value="">Seleccionar taller / proveedor</option>
+            ${talleres.map(t=>`<option>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:8px">
+          <input id="rNuevoTaller" placeholder="Agregar nuevo proveedor..." style="flex:1"/>
+          <button class="btn btn-sm" onclick="agregarTaller()">+ Agregar</button>
+        </div>
+        <textarea id="rDesc" placeholder="Observaciones adicionales..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>
+      </div>
+      <button class="btn" onclick="guardarRegistro()">Guardar registro</button>
+    </div>
+  </div>
+  ${ultimos.length > 0 ? `
+  <div class="card">
+    <div class="card-header">Últimos registros</div>
+    ${ultimos.map(r => `
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <span style="font-weight:500;font-size:13px">${r.placa}</span>
+          <span style="font-size:12px;color:#888;margin-left:8px">${r.fecha}</span>
+          <div style="font-size:13px;margin-top:2px">${r.desc||r.tipo}</div>
+          <div style="font-size:12px;color:#888">${r.taller}${r.km?' · '+fmt(r.km)+' km':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div style="font-weight:500;font-size:13px">${money(r.costo)}</div>
+          <div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div>
+        </div>
+      </div>`).join('')}
+  </div>` : ''}`;
+}
+
+window.autoFillConductor = function() {
+  const placa = $('rPlaca').value;
+  const v = vehiculos.find(x => x.placa === placa);
+  if (v) $('rConductor').value = v.conductor;
+}
+
+window.onItemChange = function() {
+  const val = $('rItem').value;
+  const placa = $('rPlaca').value;
+  $('rOtroWrap').style.display = val === '__otro__' ? 'block' : 'none';
+  const msg = $('rItemMsg');
+  if (val && val !== '__otro__' && placa) {
+    const lbl = ITEMS_BASE.find(i => i.key === val)?.label;
+    msg.textContent = `Al guardar, el km base de "${lbl}" se actualizará automáticamente.`;
+    msg.style.display = 'block';
+  } else { msg.style.display = 'none'; }
+}
+
+window.agregarTaller = async function() {
+  const t = $('rNuevoTaller').value.trim().toUpperCase();
+  if (t && !talleres.includes(t)) {
+    talleres.push(t);
+    talleres.sort();
+    await saveTalleres();
+    toast('Proveedor agregado');
+    renderView();
+  }
+}
+
+window.guardarRegistro = async function() {
+  const placa = $('rPlaca').value;
+  const fecha = $('rFecha').value;
+  const tipo = $('rTipo').value;
+  if (!placa || !fecha || !tipo) { toast('Completa los campos obligatorios'); return; }
+
+  const item = $('rItem').value;
+  const descBase = item === '__otro__' ? $('rOtro').value : (ITEMS_BASE.find(i=>i.key===item)?.label||'');
+  const obs = $('rDesc').value;
+  const desc = obs ? descBase + ' — ' + obs : descBase;
+  const km = parseInt($('rKm').value)||0;
+  const costo = parseInt($('rCosto').value)||0;
+  const taller = $('rTaller').value;
+  const conductor = $('rConductor').value;
+
+  const reg = { placa, fecha, tipo, itemBase: item, desc, km, costo, taller, conductor, ts: Date.now() };
+  await addRegistro(reg);
+
+  if (km > 0) {
+    const v = vehiculos.find(x => x.placa === placa);
+    if (v && km > (v.km||0)) await saveVehiculo(placa, { km });
+    if (item && item !== '__otro__') await saveKmBase(placa, { [item]: km });
+  }
+
+  toast('Registro guardado');
+  renderView();
+}
+
+// ── HISTORIAL ──
+function renderHistorial() {
+  const btns = vehiculos.map(v => `<button style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${histPlaca===v.placa?'#0F6E56':'#f5f5f0'};color:${histPlaca===v.placa?'#fff':'#666'}" onclick="selHist('${v.placa}')">${v.placa}</button>`).join('');
+  const v = vehiculos.find(x => x.placa === histPlaca);
+  const regs = registros.filter(r => r.placa === histPlaca).sort((a,b) => b.fecha?.localeCompare(a.fecha));
+  const total = regs.reduce((s,r) => s+(r.costo||0), 0);
+  const prev = regs.filter(r => r.tipo !== 'Correctivo').length;
+  const corr = regs.filter(r => r.tipo === 'Correctivo').length;
+
+  const estadoRows = v && v.km ? Object.keys(LABELS).map(k => {
+    if (!v.int[k]) return `<div class="row" style="justify-content:space-between"><span style="font-size:13px">${LABELS[k]}</span><div class="badge gris">Intervalo por definir</div></div>`;
+    const f = getFaltante(v, k);
+    const est = estadoBadge(f);
+    return `<div class="row" style="justify-content:space-between">
+      <span style="font-size:13px">${LABELS[k]}</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:#888">c/ ${fmt(v.int[k])} km · próx: ${fmt(getProximo(v,k))}</span>
+        <div class="badge ${est}">${f===null?'Sin dato':f<=0?'Vencido '+fmt(Math.abs(f))+' km':'Faltan '+fmt(f)+' km'}</div>
+      </div>
+    </div>`;
+  }).join('') : '';
+
+  return `
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>
+  ${v ? `<div class="grid-4" style="margin-bottom:12px">
+    ${[{l:'Tipo',v:v.tipo},{l:'Km actuales',v:v.km?fmt(v.km)+' km':'Sin km'},{l:'Prev./Pred.',v:prev},{l:'Correctivos',v:corr}].map(c=>`<div class="kpi"><label>${c.l}</label><span style="font-size:16px">${c.v}</span></div>`).join('')}
+  </div>` : ''}
+  <div class="card">
+    <div class="card-header">
+      <span>Historial ${histPlaca} (${regs.length})</span>
+      ${total > 0 ? `<span style="font-size:12px;color:#0F6E56;font-weight:500">Total: ${money(total)}</span>` : ''}
+    </div>
+    ${regs.length === 0 ? '<div class="empty">Sin registros</div>' :
+      regs.map((r,i) => `
+        <div class="row" style="justify-content:space-between" key="${i}">
+          <div>
+            <div style="font-size:13px;font-weight:500">${r.desc||r.tipo}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">${r.fecha}${r.taller?' · '+r.taller:''}${r.km?' · '+fmt(r.km)+' km':''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:12px">
+            <div style="font-weight:500;font-size:13px">${money(r.costo)}</div>
+            <div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div>
+          </div>
+        </div>`).join('')}
+  </div>
+  ${v && v.km ? `<div class="card"><div class="card-header">Estado mantenimientos — ${histPlaca}</div>${estadoRows}</div>` : ''}`;
+}
+
+window.selHist = function(p) { histPlaca = p; renderView(); }
+
+// ── INFORME MENSUAL ──
+function renderInforme() {
+  const regMes = registros.filter(r => {
+    const d = new Date(r.fecha);
+    return d.getMonth() === mesInf && d.getFullYear() === 2026;
+  });
+  const total = regMes.reduce((s,r)=>s+(r.costo||0),0);
+  const prev = regMes.filter(r=>r.tipo!=='Correctivo');
+  const corr = regMes.filter(r=>r.tipo==='Correctivo');
+  const porPlaca = {};
+  regMes.forEach(r=>{if(!porPlaca[r.placa])porPlaca[r.placa]=0;porPlaca[r.placa]+=r.costo||0;});
+  const placasOrden = Object.entries(porPlaca).sort((a,b)=>b[1]-a[1]);
+
+  const mBtns = MESES.map((m,i)=>`<button style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${mesInf===i?'#0F6E56':'#f5f5f0'};color:${mesInf===i?'#fff':'#666'}" onclick="selMes(${i})">${m}</button>`).join('');
+
+  return `
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px">${mBtns}</div>
+  <div style="font-size:14px;font-weight:500;margin-bottom:12px">Informe — ${MESES[mesInf]} 2026</div>
+  <div class="grid-4" style="margin-bottom:14px">
+    ${[{l:'Registros',v:regMes.length,c:'#185FA5'},{l:'Costo total',v:'$'+Math.round(total/1000)+'K',c:'#0F6E56'},{l:'Prev./Pred.',v:prev.length,c:'#3B6D11'},{l:'Correctivos',v:corr.length,c:'#A32D2D'}].map(k=>`<div class="kpi"><label>${k.l}</label><span style="font-size:20px;color:${k.c}">${k.v}</span></div>`).join('')}
+  </div>
+  ${regMes.length === 0 ? `<div class="empty">Sin registros para ${MESES[mesInf]} 2026</div>` : `
+  <div class="card">
+    <div class="card-header">Costo por vehículo</div>
+    ${placasOrden.map(([p,c])=>{const pct=Math.round((c/total)*100);return `
+      <div class="row" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:13px;font-weight:500">${p}</span>
+          <span style="font-size:13px;font-weight:500">${money(c)} <span style="font-size:11px;color:#888;font-weight:400">(${pct}%)</span></span>
+        </div>
+        <div class="bar-wrap"><div class="bar" style="width:${pct}%"></div></div>
+      </div>`;}).join('')}
+  </div>
+  <div class="card">
+    <div class="card-header">Detalle completo</div>
+    ${regMes.map(r=>`
+      <div class="row" style="justify-content:space-between">
+        <div><span style="font-weight:500;font-size:13px">${r.placa}</span><span style="font-size:12px;color:#888;margin-left:8px">${r.fecha}</span><div style="font-size:12px;margin-top:2px">${r.tipo} — ${r.taller}</div></div>
+        <div style="font-weight:500;font-size:13px;flex-shrink:0;margin-left:12px">${money(r.costo)}</div>
+      </div>`).join('')}
+    <div class="row" style="justify-content:space-between;font-weight:500">
+      <span>Total ${MESES[mesInf]}</span><span style="color:#0F6E56">${money(total)}</span>
+    </div>
+  </div>`}`;
+}
+
+window.selMes = function(i) { mesInf = i; renderView(); }
+
+// ── CONDUCTORES ──
+function renderConductores() {
+  return `
+  <div class="card">
+    <div class="card-header">Generar alerta WhatsApp</div>
+    <div style="padding:14px">
+      <button class="btn btn-green" onclick="genWhatsapp()">Generar mensaje WhatsApp</button>
+      <div id="waResult" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">Conductores — ${vehiculos.length} vehículos</div>
+    ${vehiculos.map(v=>`
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <span style="font-weight:500;font-size:13px">${v.conductor}</span>
+          <span style="font-size:12px;color:#888;margin-left:8px">${v.cel}</span>
+          <div style="font-size:12px;color:#888;margin-top:2px">${v.marca} ${v.modelo}</div>
+        </div>
+        <div style="font-size:12px;background:#f5f5f0;color:#888;padding:2px 10px;border-radius:5px;flex-shrink:0">${v.placa}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+window.genWhatsapp = function() {
+  const items = [];
+  vehiculos.forEach(v => {
+    if (!v.km) return;
+    Object.keys(LABELS).forEach(k => {
+      if (!v.int[k]) return;
+      const f = getFaltante(v, k);
+      if (f !== null && f <= 2000)
+        items.push({ placa:v.placa, conductor:v.conductor, cel:v.cel, item:LABELS[k], faltante:f });
+    });
+  });
+  const msg = items.length === 0 ? 'Sin alertas próximas.' :
+    `*TRANSPORTE RAVEL — Alerta de mantenimiento*\n\n${items.map(a=>`🚌 *${a.placa}* — ${a.conductor}\n   ⚠️ ${a.item}: ${a.faltante<=0?`*VENCIDO ${fmt(Math.abs(a.faltante))} km*`:`faltan *${fmt(a.faltante)} km*`}`).join('\n\n')}\n\n_Transporte Ravel — Control de flota_`;
+  $('waResult').innerHTML = `
+    <textarea readonly style="font-size:12px;background:#f5f5f0;resize:vertical;margin-bottom:8px" rows="8">${msg}</textarea>
+    <button class="btn btn-sm" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,"'")}\`)">Copiar mensaje</button>`;
+}
+
+function bindEvents() {}
+
+// ── Init ──
+initData();
+</script>
+</body>
+</html>
