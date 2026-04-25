@@ -563,12 +563,30 @@ function renderRegistro() {
   const ultimos = registros.slice(0, 8);
   return `
   <div class="card">
-    <div class="card-header">Nuevo registro de mantenimiento</div>
+    <div class="card-header">
+      <span>Subir factura (opcional)</span>
+      <span style="font-size:11px;color:var(--text-muted);font-weight:400">La IA extrae taller, fecha y valor</span>
+    </div>
+    <div style="padding:14px">
+      <label style="display:block;border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--bg)">
+        <div style="font-size:28px;margin-bottom:6px">&#129534;</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:3px">Toca para subir la factura</div>
+        <div style="font-size:12px;color:var(--text-muted)">Imagen JPG, PNG o PDF</div>
+        <input type="file" id="facturaFile" accept="image/*,.pdf" style="display:none" onchange="procesarFactura(event)"/>
+      </label>
+      <div id="facturaPreview" style="display:none;margin-top:12px;text-align:center">
+        <img id="facturaImg" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--border);object-fit:contain"/>
+      </div>
+      <div id="facturaStatus" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">Datos del mantenimiento</div>
     <div style="padding:14px">
       <div class="grid-2" style="gap:10px;margin-bottom:10px">
         <select id="rPlaca" onchange="autoFillConductor()">
           <option value="">Seleccionar vehículo</option>
-          ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.tipo} ${v.marca}</option>`).join('')}
+          ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} - ${v.tipo} ${v.marca}</option>`).join('')}
         </select>
         <input type="date" id="rFecha"/>
         <select id="rTipo">
@@ -578,15 +596,15 @@ function renderRegistro() {
         <input id="rConductor" placeholder="Conductor"/>
         <div style="grid-column:1/-1">
           <select id="rItem" onchange="onItemChange()">
-            <option value="">¿Qué mantenimiento se realizó?</option>
+            <option value="">Que mantenimiento se realizo</option>
             ${ITEMS_BASE.map(i=>`<option value="${i.key}">${i.label}</option>`).join('')}
-            <option value="__otro__">Otro (ingresar manualmente)</option>
+            <option value="__otro__">Otro</option>
           </select>
         </div>
         <div id="rOtroWrap" style="grid-column:1/-1;display:none">
           <input id="rOtro" placeholder="Describe el mantenimiento"/>
         </div>
-        <div id="rItemMsg" style="grid-column:1/-1;background:#EAF3DE;border-radius:6px;padding:8px 12px;font-size:12px;color:#3B6D11;display:none"></div>
+        <div id="rItemMsg" style="grid-column:1/-1;background:var(--green-light);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--green-text);display:none"></div>
         <input type="number" id="rKm" placeholder="Km al momento"/>
         <input type="number" id="rCosto" placeholder="Costo ($)"/>
         <div style="grid-column:1/-1">
@@ -599,32 +617,19 @@ function renderRegistro() {
           <input id="rNuevoTaller" placeholder="Agregar nuevo proveedor..." style="flex:1"/>
           <button class="btn btn-sm" onclick="agregarTaller()">+ Agregar</button>
         </div>
-        <textarea id="rDesc" placeholder="Observaciones adicionales..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>
+        <textarea id="rDesc" placeholder="Observaciones..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>
       </div>
-      <button class="btn" onclick="guardarRegistro()">Guardar registro</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn" style="flex:1" onclick="guardarRegistro()">Guardar registro</button>
+        <div id="facturaLink" style="display:none;font-size:12px;color:var(--green);background:var(--green-light);padding:6px 12px;border-radius:6px">Factura adjunta</div>
+      </div>
     </div>
   </div>
-  ${ultimos.length > 0 ? `
-  <div class="card">
-    <div class="card-header">Últimos registros</div>
-    ${ultimos.map(r => `
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <span style="font-weight:500;font-size:13px">${r.placa}</span>
-          <span style="font-size:12px;color:#888;margin-left:8px">${r.fecha}</span>
-          <div style="font-size:13px;margin-top:2px">${r.desc||r.tipo}</div>
-          <div style="font-size:12px;color:#888">${r.taller}${r.km?' · '+fmt(r.km)+' km':''}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;margin-left:12px">
-          <div style="font-weight:500;font-size:13px">${money(r.costo)}</div>
-          <div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div>
-        </div>
-      </div>`).join('')}
-  </div>` : ''}`;
+  ${ultimos.length > 0 ? `<div class="card"><div class="card-header">Ultimos registros</div>${ultimos.map(r => `<div class="row" style="justify-content:space-between"><div><span style="font-weight:500;font-size:13px">${r.placa}</span><span style="font-size:12px;color:#888;margin-left:8px">${r.fecha}</span><div style="font-size:13px;margin-top:2px">${r.desc||r.tipo}</div><div style="font-size:12px;color:#888">${r.taller}${r.km?' - '+fmt(r.km)+' km':''}</div></div><div style="text-align:right;flex-shrink:0;margin-left:12px"><div style="font-weight:500;font-size:13px">${money(r.costo)}</div><div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div></div></div>`).join('')}</div>` : ''}
+  `;
 }
 
-
-// ── LECTURA DE FACTURA CON IA ──
+// LECTURA DE FACTURA CON IA
 let facturaBase64 = null;
 let facturaMediaType = null;
 
@@ -641,10 +646,7 @@ window.procesarFactura = async function(e) {
   status.textContent = 'Analizando factura con IA...';
 
   const isImage = file.type.startsWith('image/');
-  if (isImage) {
-    preview.style.display = 'block';
-    facturaImg.src = URL.createObjectURL(file);
-  }
+  if (isImage) { preview.style.display = 'block'; facturaImg.src = URL.createObjectURL(file); }
 
   const b64 = await new Promise(function(res, rej) {
     const r = new FileReader();
@@ -656,7 +658,7 @@ window.procesarFactura = async function(e) {
   facturaMediaType = file.type;
 
   try {
-    const prompt = 'Analiza esta factura de taller automotriz colombiano. Responde SOLO con JSON valido sin texto adicional: {"taller":"nombre del proveedor","fecha":"YYYY-MM-DD o vacio","valor":numero_entero_o_0,"descripcion":"descripcion del servicio"}';
+    const prompt = 'Analiza esta factura de taller automotriz colombiano. Responde SOLO con JSON valido: {"taller":"nombre del proveedor","fecha":"YYYY-MM-DD o vacio","valor":numero_entero_o_0,"descripcion":"descripcion del servicio"}';
     const imgContent = isImage
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
       : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
@@ -668,13 +670,12 @@ window.procesarFactura = async function(e) {
     });
     const data = await resp.json();
     const rawText = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : '';
-    const clean = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
+    const cleanText = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
 
     let parsed = {};
-    try { parsed = JSON.parse(clean); } catch(err) { throw new Error('No se pudo leer la respuesta'); }
+    try { parsed = JSON.parse(cleanText); } catch(err) { throw new Error('No se pudo leer la respuesta'); }
 
     const llenados = [];
-
     if (parsed.taller) {
       const sel = document.getElementById('rTaller');
       let found = false;
@@ -686,17 +687,14 @@ window.procesarFactura = async function(e) {
       if (!found) { document.getElementById('rNuevoTaller').value = parsed.taller.toUpperCase(); }
       llenados.push('Taller: ' + parsed.taller);
     }
-
     if (parsed.fecha && parsed.fecha.length === 10) {
       document.getElementById('rFecha').value = parsed.fecha;
       llenados.push('Fecha: ' + parsed.fecha);
     }
-
     if (parsed.valor && parsed.valor > 0) {
       document.getElementById('rCosto').value = parsed.valor;
       llenados.push('Valor: $' + parseInt(parsed.valor).toLocaleString('es-CO'));
     }
-
     if (parsed.descripcion) {
       document.getElementById('rDesc').value = parsed.descripcion;
       const itemSel = document.getElementById('rItem');
@@ -707,23 +705,20 @@ window.procesarFactura = async function(e) {
       }
       llenados.push('Descripcion extraida');
     }
-
     document.getElementById('facturaLink').style.display = 'block';
-
     if (llenados.length > 0) {
       status.style.background = 'var(--green-light)';
       status.style.color = 'var(--green-text)';
-      status.textContent = 'Datos extraidos: ' + llenados.join(' | ') + ' — Verifica y completa lo restante.';
+      status.textContent = 'Datos extraidos: ' + llenados.join(' | ');
     } else {
       status.style.background = 'var(--amber-light)';
       status.style.color = 'var(--amber)';
-      status.textContent = 'No se extrajeron datos. Completa el formulario manualmente.';
+      status.textContent = 'No se extrajeron datos. Completa manualmente.';
     }
-
   } catch(err) {
     status.style.background = 'var(--red-light)';
     status.style.color = 'var(--red)';
-    status.textContent = 'Error al analizar: ' + err.message;
+    status.textContent = 'Error: ' + err.message;
   }
 };
 
@@ -926,9 +921,8 @@ window.genWhatsapp = function() {
   });
   const msg = items.length === 0 ? 'Sin alertas próximas.' :
     `*TRANSPORTE RAVEL — Alerta de mantenimiento*\n\n${items.map(a=>`🚌 *${a.placa}* — ${a.conductor}\n   ⚠️ ${a.item}: ${a.faltante<=0?`*VENCIDO ${fmt(Math.abs(a.faltante))} km*`:`faltan *${fmt(a.faltante)} km*`}`).join('\n\n')}\n\n_Transporte Ravel — Control de flota_`;
-  $('waResult').innerHTML = `
-    <textarea readonly style="font-size:12px;background:#f5f5f0;resize:vertical;margin-bottom:8px" rows="8">${msg}</textarea>
-    <button class="btn btn-sm" onclick="navigator.clipboard.writeText(\`${msg.replace(/`/g,"'")}\`)">Copiar mensaje</button>`;
+  window._waMsg = msg;
+  document.getElementById('waResult').innerHTML = '<textarea readonly style="font-size:12px;background:#f5f5f0;resize:vertical;margin-bottom:8px;width:100%" rows="8">' + msg + '</textarea><br><button class="btn btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(window._waMsg);this.textContent=\'Copiado ✓\'">Copiar mensaje</button>';
 }
 
 function bindEvents() {}
