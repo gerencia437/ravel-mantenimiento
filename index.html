@@ -563,24 +563,7 @@ window.updateKmBaseField = async function(placa, k, val) {
 function renderRegistro() {
   const ultimos = registros.slice(0, 8);
   return `
-  <div class="card">
-    <div class="card-header">
-      <span>Subir factura (opcional)</span>
-      <span style="font-size:11px;color:var(--text-muted);font-weight:400">La IA extrae taller, fecha y valor</span>
-    </div>
-    <div style="padding:14px">
-      <label style="display:block;border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--bg)">
-        <div style="font-size:28px;margin-bottom:6px">&#129534;</div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:3px">Toca para subir la factura</div>
-        <div style="font-size:12px;color:var(--text-muted)">Imagen JPG, PNG o PDF</div>
-        <input type="file" id="facturaFile" accept="image/*,.pdf" style="display:none" onchange="procesarFactura(event)"/>
-      </label>
-      <div id="facturaPreview" style="display:none;margin-top:12px;text-align:center">
-        <img id="facturaImg" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid var(--border);object-fit:contain"/>
-      </div>
-      <div id="facturaStatus" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px"></div>
-    </div>
-  </div>
+
   <div class="card">
     <div class="card-header">Datos del mantenimiento</div>
     <div style="padding:14px">
@@ -620,10 +603,7 @@ function renderRegistro() {
         </div>
         <textarea id="rDesc" placeholder="Observaciones..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>
       </div>
-      <div style="display:flex;gap:10px;align-items:center">
-        <button class="btn" style="flex:1" onclick="guardarRegistro()">Guardar registro</button>
-        <div id="facturaLink" style="display:none;font-size:12px;color:var(--green);background:var(--green-light);padding:6px 12px;border-radius:6px">Factura adjunta</div>
-      </div>
+      <button class="btn" style="width:100%" onclick="guardarRegistro()">Guardar registro</button>
     </div>
   </div>
   ${ultimos.length > 0 ? `<div class="card"><div class="card-header">Ultimos registros</div>${ultimos.map(r => `<div class="row" style="justify-content:space-between"><div><span style="font-weight:500;font-size:13px">${r.placa}</span><span style="font-size:12px;color:#888;margin-left:8px">${r.fecha}</span><div style="font-size:13px;margin-top:2px">${r.desc||r.tipo}</div><div style="font-size:12px;color:#888">${r.taller}${r.km?' - '+fmt(r.km)+' km':''}</div></div><div style="text-align:right;flex-shrink:0;margin-left:12px"><div style="font-weight:500;font-size:13px">${money(r.costo)}</div><div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div></div></div>`).join('')}</div>` : ''}
