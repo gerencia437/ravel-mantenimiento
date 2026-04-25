@@ -85,7 +85,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ── Datos maestros ──
 const INT_BUS = {motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
 const INT_NPR_EXU = {motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
 const INT_NPR_NNM = {motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
@@ -130,7 +129,6 @@ const ITEMS_BASE = Object.entries(LABELS).map(([k,l])=>({key:k,label:l}));
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const TALLERES_SEED = ["A.R VIDRIOS AUTOMOTRIZ","ALEXANDER MEJIA (EL NIÑO)","ANIBAL RADIADORES","AUTOS EL REY","AUTOLARTE","BENDY REPUESTOS","CARHAUS AUTOMOTRIZ SAS","CARIBE MOTOR","CARROCERO","CASTRO TORO JHON DAYRO","CHALO AVISOS SAS","CHAMPION SAS","CM AUTOPARTES","DANER ARNETH LOPEZ","DARWIN GIOVANY AGUDELO","DANIEL BOMBA URVAN","DIEGO TRUJILLO","DIESEL AMBIENTAL","DIESEL ANDINO","DISTRIBUIDORA NISSAN","DIRECCIONES BUFALO","DZ ELECTRICO","EURIPIDES","EJES Y RADIADORES DEL NORTE","EL TRAPICHE","ELECTRILAGOS","FENIX","FIBRAS ESCUDERO SAS","FRENOS AYURA","FRENOS Y AIRES MEDELLIN","FRENOS FALCIONI","GALVIS BORRERO JULIO","GIOVANY DELGADO","GENERACION DIESEL","GLOBAL PARTES","GRUAXEPRESS","GUAYAS EL ABUELO","HELICOIL","HERNANDO JOSE BENITEZ","INVERSIONES LOTERO PELAEZ","JHONY ALEXANDER GARCIA","JULIO CESAR GALVIS","JUAN CARLOS MORENO","LABORATORIO JJ DIESEL","LABORATORIO REPARDIESEL","LALO COMPRESORES","LA CASA DEL EMBRAGUE","LODARYS TORRES","LOS PRIMOS","LUJOS EL TRAPICHE","MUELLES CART","MUNDO LUJOS","NATALUJOS IRMA NATALIA","NANO FRENOS","NIPON PARTES","NISSAN Y CAMPEROS","ODMEL S.A.S","OLMED VIGIAS","ORIENTAL DE VIDRIOS","PABLO GOMEZ FRENOS","PACHO DIESEL","PETETE","PROPARTES","RAMO ELECTRICOS","RICARDO PALOMARES","REAL VIDRIOS","RECTIFICADORA JOAR","REPUESTOS Y SERVICIOS D&J SAS","RYH REPUESTOS","SERVIREENCAUCHE DE COLOMBIA SA","SERVITECA LISTO","SEA ITAGUI","SOLO TURBOS","SOLO FRENOS (PETETE)","TALLER INDUSTRIAL LA MACARENA","TALLER LOS PRIMOS","TALLER LUCHO","TALLER RAVEL","TALLER SANCAR","TALLER PROPIO","TAVO FRENOS","TAXIMTEROS EL CHUPA","TECNICENTRO LOS COLORES","VIVIANA MARITZA-NANO","WILLIAN ELECTRICO GUARNE","WILSON RUIZ","WILDER MAURICIO MENDOZA","YOMANALBEIRO","YUBERNEY TAMAYO","YULI CINTURONES","ZULED","ZULUAGA BERRIO SARAH","PUNTO LUJOS"];
 
-// ── Estado global ──
 let VIEW = "Alertas";
 let vehiculos = [];
 let registros = [];
@@ -141,9 +139,11 @@ let histPlaca = "";
 let mesInf = new Date().getMonth();
 let conductoresData = [];
 
+// ── VARIABLE GLOBAL para importación (fix del bug) ──
+let pendingImport = [];
+
 const NAVS = ["Alertas","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
 
-// ── Utilidades ──
 const $ = id => document.getElementById(id);
 const fmt = n => n?.toLocaleString('es-CO') ?? '—';
 const money = n => n > 0 ? '$'+fmt(n) : '—';
@@ -179,9 +179,7 @@ function dotColor(est) {
   return {rojo:'#A32D2D',amarillo:'#BA7517',verde:'#3B6D11',gris:'#999'}[est] || '#999';
 }
 
-// ── Firebase helpers ──
 async function initData() {
-  // Vehiculos
   const vSnap = await getDocs(collection(db, 'vehiculos'));
   if (vSnap.empty) {
     for (const v of VEHICULOS_SEED) {
@@ -196,23 +194,14 @@ async function initData() {
     });
   }
 
-  // KmBase
   const kSnap = await getDocs(collection(db, 'kmBase'));
   kSnap.forEach(d => { kmBase[d.id] = d.data(); });
 
-  // Registros
   const rSnap = await getDocs(query(collection(db, 'registros'), orderBy('fecha', 'desc')));
   registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // Talleres
   const tSnap = await getDoc(doc(db, 'config', 'talleres'));
   if (tSnap.exists()) talleres = tSnap.data().lista;
-
-  // Conductores
-  conductoresData = vehiculos.map(v => ({
-    placa: v.placa, conductor: v.conductor, cel: v.cel,
-    desde: '2026-01-01', historial: []
-  }));
 
   histPlaca = vehiculos[0]?.placa || '';
   document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · Control preventivo 2026`;
@@ -242,7 +231,6 @@ async function saveTalleres() {
   await setDoc(doc(db, 'config', 'talleres'), { lista: talleres });
 }
 
-// ── Render ──
 function renderNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = NAVS.map(n =>
@@ -370,6 +358,9 @@ window.procesarImport = function(e) {
     const actualizan = enFlota.filter(r => { const v = vehiculos.find(x => x.placa === r.placa); return r.km > (v?.km||0); });
     const noPlacas = vehiculos.filter(v => !enFlota.find(r => r.placa === v.placa));
 
+    // ── GUARDAR EN VARIABLE GLOBAL (fix del bug) ──
+    pendingImport = actualizan;
+
     $('importResult').innerHTML = `
       <div class="grid-4" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
         <div class="kpi"><label>Se actualizarán</label><span style="color:#3B6D11">${actualizan.length}</span></div>
@@ -394,16 +385,24 @@ window.procesarImport = function(e) {
           </div>`;
         }).join('')}
       </div>
-      <button class="btn" style="width:100%" onclick="aplicarImport(${JSON.stringify(actualizan)})">Aplicar ${actualizan.length} actualizaciones</button>`;
+      <button class="btn" style="width:100%" onclick="aplicarImport()">Aplicar ${actualizan.length} actualizaciones</button>`;
   };
   reader.readAsText(file, 'UTF-8');
 }
 
-window.aplicarImport = async function(rows) {
-  for (const r of rows) {
+// ── CORREGIDO: ya no recibe parámetro, usa pendingImport ──
+window.aplicarImport = async function() {
+  if (!pendingImport || pendingImport.length === 0) {
+    toast('No hay actualizaciones pendientes');
+    return;
+  }
+  const btn = document.querySelector('#importResult .btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Aplicando...'; }
+  for (const r of pendingImport) {
     await saveVehiculo(r.placa, { km: r.km });
   }
-  toast('Kilometrajes actualizados');
+  pendingImport = [];
+  toast('Kilometrajes actualizados ✓');
   renderView();
 }
 
@@ -712,7 +711,6 @@ window.genWhatsapp = function() {
 
 function bindEvents() {}
 
-// ── Init ──
 initData();
 </script>
 </body>
