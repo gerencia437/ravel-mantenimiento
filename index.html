@@ -239,11 +239,15 @@ window.doLogin = async function() {
   sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
   document.getElementById('loginWrap').style.display = 'none';
   document.getElementById('appWrap').style.display = 'block';
-  // Mostrar chip usuario
   const initials = nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('userAvatar').textContent = initials;
-  document.getElementById('userNombreChip').textContent = nombre.split(' ')[0];
+  const rolLbl = rol === 'superadmin' ? ' · Admin' : rol === 'tecnico' ? ' · Técnico' : '';
+  document.getElementById('userNombreChip').textContent = nombre.split(' ')[0] + rolLbl;
   await initData();
+  if (rol === 'superadmin') {
+    const uSnap = await getDocs(collection(db, 'usuarios'));
+    usuariosLista = uSnap.docs.map(d => ({id: d.id, ...d.data()}));
+  }
 }
 
 window.cerrarSesion = function() {
@@ -258,38 +262,44 @@ window.cerrarSesion = function() {
 // Verificar sesión activa al cargar - se ejecuta al final
 async function checkSession() {
   const saved = sessionStorage.getItem('ravelUser');
-  if (saved) {
-    try {
-      const savedUser = JSON.parse(saved);
-      // Siempre reverificar rol desde Firebase al recargar
-      try {
-        const freshSnap = await getDoc(doc(db, 'usuarios', savedUser.cedula));
-        if (freshSnap.exists()) {
-          savedUser.rol = freshSnap.data().rol || 'conductor';
-        }
-      } catch(e) { console.log('No se pudo reverificar rol:', e); }
-      currentUser = savedUser;
-      sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
-      document.getElementById('loginWrap').style.display = 'none';
-      document.getElementById('appWrap').style.display = 'block';
-      const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-      document.getElementById('userAvatar').textContent = initials;
-      const rolLabel = currentUser.rol === 'superadmin' ? ' · Admin' : currentUser.rol === 'tecnico' ? ' · Técnico' : '';
-      document.getElementById('userNombreChip').textContent = currentUser.nombre.split(' ')[0] + rolLabel;
-    } catch(e) { sessionStorage.removeItem('ravelUser'); }
+  if (!saved) return false;
+  try {
+    const savedUser = JSON.parse(saved);
+    // SIEMPRE leer rol fresco desde Firebase
+    const freshSnap = await getDoc(doc(db, 'usuarios', savedUser.cedula));
+    if (freshSnap.exists()) {
+      savedUser.rol = freshSnap.data().rol || 'conductor';
+      savedUser.nombre = freshSnap.data().nombre || savedUser.nombre;
+    }
+    currentUser = savedUser;
+    sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
+    return true;
+  } catch(e) {
+    sessionStorage.removeItem('ravelUser');
+    return false;
   }
 }
-// checkSession ya es async - llamarla correctamente
-checkSession().then(() => {
-  if (currentUser) {
-    initData();
+
+async function iniciarApp() {
+  const haySesion = await checkSession();
+  if (haySesion && currentUser) {
+    // Mostrar app con datos correctos
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('userAvatar').textContent = initials;
+    const rolLabel = currentUser.rol === 'superadmin' ? ' · Admin' : currentUser.rol === 'tecnico' ? ' · Técnico' : '';
+    document.getElementById('userNombreChip').textContent = currentUser.nombre.split(' ')[0] + rolLabel;
+    // Cargar datos
+    await initData();
     if (currentUser.rol === 'superadmin') {
-      getDocs(collection(db, 'usuarios')).then(snap => {
-        usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
-      });
+      const snap = await getDocs(collection(db, 'usuarios'));
+      usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
     }
   }
-});
+}
+
+iniciarApp();
 
 function toast(msg) {
   const t = $('toast');
