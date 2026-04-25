@@ -53,19 +53,63 @@
   .alert-box .title{font-size:13px;font-weight:500;color:#A32D2D;margin-bottom:8px}
   .alert-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid #f7c1c1}
   .alert-row:last-child{border-bottom:none}
+  /* LOGIN */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f5f0;padding:20px}
+  .login-card{background:#fff;border:0.5px solid #e5e5e0;border-radius:14px;max-width:380px;width:100%;overflow:hidden}
+  .login-head{background:#0F6E56;padding:28px 24px 20px;text-align:center;color:#fff}
+  .login-head .logo-big{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin:0 auto 12px}
+  .login-head h2{font-size:17px;font-weight:600;margin-bottom:4px}
+  .login-head p{font-size:12px;opacity:0.8}
+  .login-body{padding:24px}
+  .login-field{margin-bottom:14px}
+  .login-field label{font-size:12px;font-weight:500;color:#555;display:block;margin-bottom:5px}
+  .login-field input{font-size:14px;padding:10px 12px}
+  .btn-login{width:100%;padding:11px;font-size:14px;font-weight:600;border-radius:8px}
+  .login-err{background:#FCEBEB;color:#A32D2D;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px;display:none}
+  .user-chip{display:flex;align-items:center;gap:6px;background:#EAF3DE;border-radius:20px;padding:3px 10px 3px 4px;font-size:12px;color:#3B6D11;cursor:pointer}
+  .user-chip .avatar{width:22px;height:22px;border-radius:50%;background:#0F6E56;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
 </style>
 </head>
 <body>
+<!-- PANTALLA LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div class="login-head">
+      <div class="logo-big">TR</div>
+      <h2>Transporte Ravel</h2>
+      <p>Control de Mantenimiento</p>
+    </div>
+    <div class="login-body">
+      <div class="login-err" id="loginErr"></div>
+      <div class="login-field">
+        <label>Número de cédula</label>
+        <input type="number" id="loginCedula" placeholder="Ej: 1234567890" onkeydown="if(event.key==='Enter') doLogin()"/>
+      </div>
+      <div class="login-field">
+        <label>Nombre completo</label>
+        <input type="text" id="loginNombre" placeholder="Ej: Juan Pérez" onkeydown="if(event.key==='Enter') doLogin()"/>
+      </div>
+      <button class="btn btn-login" onclick="doLogin()">Ingresar</button>
+    </div>
+  </div>
+</div>
+<!-- APP PRINCIPAL -->
+<div id="appWrap" style="display:none">
 <div class="app">
   <div class="header">
     <div class="logo">TR</div>
-    <div class="header-text">
+    <div class="header-text" style="flex:1">
       <h1>Transporte Ravel — Mantenimiento</h1>
       <p id="subtitulo">Cargando...</p>
+    </div>
+    <div class="user-chip" onclick="cerrarSesion()" title="Cerrar sesión">
+      <div class="avatar" id="userAvatar">?</div>
+      <span id="userNombreChip">...</span>
     </div>
   </div>
   <div class="nav" id="nav"></div>
   <div id="content"><div class="loading">Cargando datos...</div></div>
+</div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -138,15 +182,62 @@ let alertFiltro = "todos";
 let histPlaca = "";
 let mesInf = new Date().getMonth();
 let conductoresData = [];
-
-// ── VARIABLE GLOBAL para importación (fix del bug) ──
 let pendingImport = [];
+
+// ── USUARIO ACTUAL ──
+let currentUser = null; // { cedula, nombre }
 
 const NAVS = ["Alertas","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
 
 const $ = id => document.getElementById(id);
 const fmt = n => n?.toLocaleString('es-CO') ?? '—';
 const money = n => n > 0 ? '$'+fmt(n) : '—';
+
+// ── LOGIN ──
+window.doLogin = async function() {
+  const cedula = document.getElementById('loginCedula').value.trim();
+  const nombre = document.getElementById('loginNombre').value.trim();
+  const errEl = document.getElementById('loginErr');
+  errEl.style.display = 'none';
+  if (!cedula || cedula.length < 5) { errEl.textContent = 'Ingresa un número de cédula válido.'; errEl.style.display = 'block'; return; }
+  if (!nombre || nombre.length < 3) { errEl.textContent = 'Ingresa tu nombre completo.'; errEl.style.display = 'block'; return; }
+  // Guardar o actualizar usuario en Firebase
+  await setDoc(doc(db, 'usuarios', cedula), { cedula, nombre, ultimoAcceso: new Date().toISOString() }, { merge: true });
+  currentUser = { cedula, nombre };
+  // Guardar en sessionStorage para no pedir en cada recarga
+  sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
+  document.getElementById('loginWrap').style.display = 'none';
+  document.getElementById('appWrap').style.display = 'block';
+  // Mostrar chip usuario
+  const initials = nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('userAvatar').textContent = initials;
+  document.getElementById('userNombreChip').textContent = nombre.split(' ')[0];
+  await initData();
+}
+
+window.cerrarSesion = function() {
+  sessionStorage.removeItem('ravelUser');
+  currentUser = null;
+  document.getElementById('appWrap').style.display = 'none';
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('loginCedula').value = '';
+  document.getElementById('loginNombre').value = '';
+}
+
+// Verificar sesión activa al cargar
+(function checkSession() {
+  const saved = sessionStorage.getItem('ravelUser');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('appWrap').style.display = 'block';
+      const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      document.getElementById('userAvatar').textContent = initials;
+      document.getElementById('userNombreChip').textContent = currentUser.nombre.split(' ')[0];
+    } catch(e) { sessionStorage.removeItem('ravelUser'); }
+  }
+})();
 
 function toast(msg) {
   const t = $('toast');
@@ -204,7 +295,7 @@ async function initData() {
   if (tSnap.exists()) talleres = tSnap.data().lista;
 
   histPlaca = vehiculos[0]?.placa || '';
-  document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · Control preventivo 2026`;
+  document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · ${currentUser ? currentUser.nombre : ''} · 2026`;
   renderNav();
   renderView();
 }
@@ -556,7 +647,10 @@ window.guardarRegistro = async function() {
   const taller = $('rTaller').value;
   const conductor = $('rConductor').value;
 
-  const reg = { placa, fecha, tipo, itemBase: item, desc, km, costo, taller, conductor, ts: Date.now() };
+  const reg = { placa, fecha, tipo, itemBase: item, desc, km, costo, taller, conductor,
+    registradoPor: currentUser ? currentUser.nombre : '',
+    cedulaRegistro: currentUser ? currentUser.cedula : '',
+    ts: Date.now() };
   await addRegistro(reg);
 
   if (km > 0) {
@@ -606,7 +700,7 @@ function renderHistorial() {
         <div class="row" style="justify-content:space-between" key="${i}">
           <div>
             <div style="font-size:13px;font-weight:500">${r.desc||r.tipo}</div>
-            <div style="font-size:12px;color:#888;margin-top:2px">${r.fecha}${r.taller?' · '+r.taller:''}${r.km?' · '+fmt(r.km)+' km':''}</div>
+            <div style="font-size:12px;color:#888;margin-top:2px">${r.fecha}${r.taller?' · '+r.taller:''}${r.km?' · '+fmt(r.km)+' km':''}${r.registradoPor?' · '+r.registradoPor:''}</div>
           </div>
           <div style="text-align:right;flex-shrink:0;margin-left:12px">
             <div style="font-weight:500;font-size:13px">${money(r.costo)}</div>
@@ -711,7 +805,8 @@ window.genWhatsapp = function() {
 
 function bindEvents() {}
 
-initData();
+// Solo iniciar si ya hay sesión activa
+if (currentUser) initData();
 </script>
 </body>
 </html>
