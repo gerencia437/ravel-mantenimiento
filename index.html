@@ -223,8 +223,16 @@ window.doLogin = async function() {
   if (!cedula || cedula.length < 5) { errEl.textContent = 'Ingresa un número de cédula válido.'; errEl.style.display = 'block'; return; }
   if (!nombre || nombre.length < 3) { errEl.textContent = 'Ingresa tu nombre completo.'; errEl.style.display = 'block'; return; }
   // Guardar o actualizar usuario en Firebase
-  await setDoc(doc(db, 'usuarios', cedula), { cedula, nombre, ultimoAcceso: new Date().toISOString() }, { merge: true });
-  currentUser = { cedula, nombre };
+  const userSnap = await getDoc(doc(db, 'usuarios', cedula));
+  let rol = 'conductor';
+  if (userSnap.exists()) {
+    rol = userSnap.data().rol || 'conductor';
+  } else {
+    const usersSnap = await getDocs(collection(db, 'usuarios'));
+    if (usersSnap.empty) rol = 'superadmin';
+  }
+  await setDoc(doc(db, 'usuarios', cedula), { cedula, nombre, ultimoAcceso: new Date().toISOString(), rol }, { merge: true });
+  currentUser = { cedula, nombre, rol };
   // Guardar en sessionStorage para no pedir en cada recarga
   sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
   document.getElementById('loginWrap').style.display = 'none';
@@ -255,7 +263,8 @@ function checkSession() {
       document.getElementById('appWrap').style.display = 'block';
       const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
       document.getElementById('userAvatar').textContent = initials;
-      document.getElementById('userNombreChip').textContent = currentUser.nombre.split(' ')[0];
+      const rolLabel = currentUser.rol === 'superadmin' ? ' · Admin' : currentUser.rol === 'tecnico' ? ' · Técnico' : '';
+      document.getElementById('userNombreChip').textContent = currentUser.nombre.split(' ')[0] + rolLabel;
     } catch(e) { sessionStorage.removeItem('ravelUser'); }
   }
 }
@@ -1105,10 +1114,69 @@ window.genWhatsapp = function() {
   document.getElementById('waResult').innerHTML = '<textarea readonly style="font-size:12px;background:#f5f5f0;resize:vertical;margin-bottom:8px;width:100%" rows="8">' + msg + '</textarea><br><button class="btn btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(window._waMsg);this.textContent=\'Copiado ✓\'">Copiar mensaje</button>';
 }
 
+
+// ── USUARIOS ──
+let usuariosLista = [];
+
+async function cargarUsuarios() {
+  const snap = await getDocs(collection(db, 'usuarios'));
+  usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  renderView();
+}
+
+function renderUsuarios() {
+  if (!currentUser || currentUser.rol !== 'superadmin') {
+    return '<div class="empty">No tienes permisos para ver esta sección.</div>';
+  }
+
+  const rolLabel = { superadmin: '👑 Super Admin', tecnico: '🔧 Técnico', conductor: '🚌 Conductor' };
+  const rolColor = { superadmin: '#185FA5', tecnico: '#3B6D11', conductor: '#BA7517' };
+
+  return '<div class="card">' +
+    '<div class="card-header"><span>Gestión de usuarios (' + usuariosLista.length + ')</span>' +
+    '<button class="btn btn-sm" onclick="cargarUsuarios()">↻ Actualizar</button></div>' +
+    (usuariosLista.length === 0 ?
+      '<div class="empty">No hay usuarios registrados aún.<br><small>Los usuarios aparecen aquí cuando ingresan por primera vez.</small></div>' :
+      usuariosLista.map(u => {
+        const esYo = u.cedula === currentUser.cedula;
+        return '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+          '<div>' +
+            '<div style="font-weight:600;font-size:13px">' + u.nombre + (esYo ? ' <span style="font-size:11px;color:var(--text-muted)">(tú)</span>' : '') + '</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">CC: ' + u.cedula + ' · Último acceso: ' + (u.ultimoAcceso ? u.ultimoAcceso.substring(0,10) : 'nunca') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:11px;font-weight:600;color:' + (rolColor[u.rol] || '#888') + '">' + (rolLabel[u.rol] || u.rol) + '</span>' +
+            (!esYo ? '<select style="font-size:12px;padding:4px 8px;width:auto" onchange="cambiarRol('' + u.cedula + '',this.value)">' +
+              '<option value="conductor" ' + (u.rol==='conductor'?'selected':'') + '>Conductor</option>' +
+              '<option value="tecnico" ' + (u.rol==='tecnico'?'selected':'') + '>Técnico</option>' +
+              '<option value="superadmin" ' + (u.rol==='superadmin'?'selected':'') + '>Super Admin</option>' +
+            '</select>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('')
+    ) +
+  '</div>';
+}
+
+window.cambiarRol = async function(cedula, nuevoRol) {
+  await setDoc(doc(db, 'usuarios', cedula), { rol: nuevoRol }, { merge: true });
+  const idx = usuariosLista.findIndex(u => u.cedula === cedula);
+  if (idx >= 0) usuariosLista[idx].rol = nuevoRol;
+  toast('Rol actualizado ✓');
+  renderView();
+}
+
 function bindEvents() {}
 
 // Solo iniciar si ya hay sesión activa
-if (currentUser) initData();
+if (currentUser) {
+  initData();
+  if (currentUser.rol === 'superadmin') {
+    getDocs(collection(db, 'usuarios')).then(snap => {
+      usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    });
+  }
+}
 </script>
 </body>
 </html>
