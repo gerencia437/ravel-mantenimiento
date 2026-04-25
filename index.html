@@ -638,14 +638,17 @@ window.procesarFactura = async function(e) {
   status.style.display = 'block';
   status.style.background = '#F7F8FA';
   status.style.color = '#555';
-  status.innerHTML = '&#9203; Analizando factura con IA...';
+  status.textContent = 'Analizando factura con IA...';
 
   const isImage = file.type.startsWith('image/');
-  if (isImage) { preview.style.display = 'block'; facturaImg.src = URL.createObjectURL(file); }
+  if (isImage) {
+    preview.style.display = 'block';
+    facturaImg.src = URL.createObjectURL(file);
+  }
 
-  const b64 = await new Promise((res,rej) => {
+  const b64 = await new Promise(function(res, rej) {
     const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
+    r.onload = function() { res(r.result.split(',')[1]); };
     r.onerror = rej;
     r.readAsDataURL(file);
   });
@@ -653,67 +656,56 @@ window.procesarFactura = async function(e) {
   facturaMediaType = file.type;
 
   try {
-    const msgContent = isImage
-      ? [
-          {type:'image',source:{type:'base64',media_type:file.type,data:b64}},
-          {type:'text',text:'Eres un asistente de contabilidad para una empresa de transporte colombiana. Analiza esta factura de taller automotriz y extrae los datos. Responde UNICAMENTE con un objeto JSON valido, sin texto antes ni despues, sin bloques de codigo. Formato exacto: {"taller":"nombre completo del taller o proveedor","fecha":"YYYY-MM-DD o cadena vacia si no aparece","valor":numero entero sin puntos ni comas ni simbolos (0 si no aparece),"descripcion":"descripcion completa del servicio realizado segun la factura"}'}
-        ]
-      : [
-          {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-          {type:'text',text:'Eres un asistente de contabilidad para una empresa de transporte colombiana. Analiza esta factura de taller automotriz y extrae los datos. Responde UNICAMENTE con un objeto JSON valido, sin texto antes ni despues, sin bloques de codigo. Formato exacto: {"taller":"nombre completo del taller o proveedor","fecha":"YYYY-MM-DD o cadena vacia si no aparece","valor":numero entero sin puntos ni comas ni simbolos (0 si no aparece),"descripcion":"descripcion completa del servicio realizado segun la factura"}'}
-        ];
+    const prompt = 'Analiza esta factura de taller automotriz colombiano. Responde SOLO con JSON valido sin texto adicional: {"taller":"nombre del proveedor","fecha":"YYYY-MM-DD o vacio","valor":numero_entero_o_0,"descripcion":"descripcion del servicio"}';
+    const imgContent = isImage
+      ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
+      : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:msgContent}]})
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514', max_tokens:400, messages:[{role:'user', content:imgContent}]})
     });
     const data = await resp.json();
-    const text = (data.content?.find(b=>b.type==='text')?.text||'').replace(/```json|```/g,'').trim();
+    const rawText = (data.content && data.content[0] && data.content[0].text) ? data.content[0].text : '';
+    const clean = rawText.replace(/```json/g,'').replace(/```/g,'').trim();
 
     let parsed = {};
-    try { parsed = JSON.parse(text); } catch(err) { throw new Error('No se pudo leer la respuesta de IA: '+text.substring(0,80)); }
+    try { parsed = JSON.parse(clean); } catch(err) { throw new Error('No se pudo leer la respuesta'); }
 
-    // Rellenar campos del formulario
-    let llenados = [];
+    const llenados = [];
 
     if (parsed.taller) {
-      // Buscar si el taller ya existe en la lista
       const sel = document.getElementById('rTaller');
       let found = false;
-      for (let i=0; i<sel.options.length; i++) {
-        if (sel.options[i].text.toUpperCase().includes(parsed.taller.toUpperCase().substring(0,8))) {
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].text.toUpperCase().indexOf(parsed.taller.toUpperCase().substring(0,8)) >= 0) {
           sel.selectedIndex = i; found = true; break;
         }
       }
-      if (!found) {
-        // Poner en el campo de nuevo proveedor
-        document.getElementById('rNuevoTaller').value = parsed.taller.toUpperCase();
-      }
+      if (!found) { document.getElementById('rNuevoTaller').value = parsed.taller.toUpperCase(); }
       llenados.push('Taller: ' + parsed.taller);
     }
 
-    if (parsed.fecha && parsed.fecha.match(/\d{4}-\d{2}-\d{2}/)) {
+    if (parsed.fecha && parsed.fecha.length === 10) {
       document.getElementById('rFecha').value = parsed.fecha;
       llenados.push('Fecha: ' + parsed.fecha);
     }
 
     if (parsed.valor && parsed.valor > 0) {
       document.getElementById('rCosto').value = parsed.valor;
-      llenados.push('Valor: $' + parsed.valor.toLocaleString('es-CO'));
+      llenados.push('Valor: $' + parseInt(parsed.valor).toLocaleString('es-CO'));
     }
 
     if (parsed.descripcion) {
-      const descEl = document.getElementById('rDesc');
-      descEl.value = parsed.descripcion;
-      // Activar "Otro" en el selector de ítem si no hay uno seleccionado
+      document.getElementById('rDesc').value = parsed.descripcion;
       const itemSel = document.getElementById('rItem');
       if (!itemSel.value) {
         itemSel.value = '__otro__';
         document.getElementById('rOtroWrap').style.display = 'block';
-        document.getElementById('rOtro').value = parsed.descripcion.substring(0,80);
+        document.getElementById('rOtro').value = parsed.descripcion.substring(0, 80);
       }
-      llenados.push('Descripción extraída');
+      llenados.push('Descripcion extraida');
     }
 
     document.getElementById('facturaLink').style.display = 'block';
@@ -721,19 +713,20 @@ window.procesarFactura = async function(e) {
     if (llenados.length > 0) {
       status.style.background = 'var(--green-light)';
       status.style.color = 'var(--green-text)';
-      status.innerHTML = '&#10003; Datos extraídos: ' + llenados.join(' · ') + '<br><span style="font-size:11px;opacity:0.8">Verifica y completa los campos restantes</span>';
+      status.textContent = 'Datos extraidos: ' + llenados.join(' | ') + ' — Verifica y completa lo restante.';
     } else {
       status.style.background = 'var(--amber-light)';
       status.style.color = 'var(--amber)';
-      status.innerHTML = '&#9888; No se pudieron extraer datos automáticamente. Completa el formulario manualmente.';
+      status.textContent = 'No se extrajeron datos. Completa el formulario manualmente.';
     }
 
   } catch(err) {
     status.style.background = 'var(--red-light)';
     status.style.color = 'var(--red)';
-    status.innerHTML = '&#10007; Error al analizar: ' + err.message;
+    status.textContent = 'Error al analizar: ' + err.message;
   }
-}
+};
+
 
 window.autoFillConductor = function() {
   const placa = $('rPlaca').value;
