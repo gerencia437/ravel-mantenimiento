@@ -256,7 +256,7 @@ window.cerrarSesion = function() {
 }
 
 // Verificar sesión activa al cargar - se ejecuta al final
-function checkSession() {
+async function checkSession() {
   const saved = sessionStorage.getItem('ravelUser');
   if (saved) {
     try {
