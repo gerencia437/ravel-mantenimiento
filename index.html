@@ -1146,7 +1146,7 @@ function renderUsuarios() {
           '</div>' +
           '<div style="display:flex;align-items:center;gap:8px">' +
             '<span style="font-size:11px;font-weight:600;color:' + (rolColor[u.rol] || '#888') + '">' + (rolLabel[u.rol] || u.rol) + '</span>' +
-            (!esYo ? '<select style="font-size:12px;padding:4px 8px;width:auto" onchange="cambiarRol('' + u.cedula + '',this.value)">' +
+            (!esYo ? '<select style="font-size:12px;padding:4px 8px;width:auto" onchange="cambiarRol(\'' + u.cedula + '\',this.value)">' +
               '<option value="conductor" ' + (u.rol==='conductor'?'selected':'') + '>Conductor</option>' +
               '<option value="tecnico" ' + (u.rol==='tecnico'?'selected':'') + '>Técnico</option>' +
               '<option value="superadmin" ' + (u.rol==='superadmin'?'selected':'') + '>Super Admin</option>' +
