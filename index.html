@@ -193,7 +193,7 @@ const ITEMS_BASE = Object.entries(LABELS).map(([k,l])=>({key:k,label:l}));
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const TALLERES_SEED = ["A.R VIDRIOS AUTOMOTRIZ","ALEXANDER MEJIA (EL NIÑO)","ANIBAL RADIADORES","AUTOS EL REY","AUTOLARTE","BENDY REPUESTOS","CARHAUS AUTOMOTRIZ SAS","CARIBE MOTOR","CARROCERO","CASTRO TORO JHON DAYRO","CHALO AVISOS SAS","CHAMPION SAS","CM AUTOPARTES","DANER ARNETH LOPEZ","DARWIN GIOVANY AGUDELO","DANIEL BOMBA URVAN","DIEGO TRUJILLO","DIESEL AMBIENTAL","DIESEL ANDINO","DISTRIBUIDORA NISSAN","DIRECCIONES BUFALO","DZ ELECTRICO","EURIPIDES","EJES Y RADIADORES DEL NORTE","EL TRAPICHE","ELECTRILAGOS","FENIX","FIBRAS ESCUDERO SAS","FRENOS AYURA","FRENOS Y AIRES MEDELLIN","FRENOS FALCIONI","GALVIS BORRERO JULIO","GIOVANY DELGADO","GENERACION DIESEL","GLOBAL PARTES","GRUAXEPRESS","GUAYAS EL ABUELO","HELICOIL","HERNANDO JOSE BENITEZ","INVERSIONES LOTERO PELAEZ","JHONY ALEXANDER GARCIA","JULIO CESAR GALVIS","JUAN CARLOS MORENO","LABORATORIO JJ DIESEL","LABORATORIO REPARDIESEL","LALO COMPRESORES","LA CASA DEL EMBRAGUE","LODARYS TORRES","LOS PRIMOS","LUJOS EL TRAPICHE","MUELLES CART","MUNDO LUJOS","NATALUJOS IRMA NATALIA","NANO FRENOS","NIPON PARTES","NISSAN Y CAMPEROS","ODMEL S.A.S","OLMED VIGIAS","ORIENTAL DE VIDRIOS","PABLO GOMEZ FRENOS","PACHO DIESEL","PETETE","PROPARTES","RAMO ELECTRICOS","RICARDO PALOMARES","REAL VIDRIOS","RECTIFICADORA JOAR","REPUESTOS Y SERVICIOS D&J SAS","RYH REPUESTOS","SERVIREENCAUCHE DE COLOMBIA SA","SERVITECA LISTO","SEA ITAGUI","SOLO TURBOS","SOLO FRENOS (PETETE)","TALLER INDUSTRIAL LA MACARENA","TALLER LOS PRIMOS","TALLER LUCHO","TALLER RAVEL","TALLER SANCAR","TALLER PROPIO","TAVO FRENOS","TAXIMTEROS EL CHUPA","TECNICENTRO LOS COLORES","VIVIANA MARITZA-NANO","WILLIAN ELECTRICO GUARNE","WILSON RUIZ","WILDER MAURICIO MENDOZA","YOMANALBEIRO","YUBERNEY TAMAYO","YULI CINTURONES","ZULED","ZULUAGA BERRIO SARAH","PUNTO LUJOS"];
 
-let VIEW = "Alertas";
+let VIEW = "Dashboard";
 let vehiculos = [];
 let registros = [];
 let kmBase = {};
@@ -208,8 +208,8 @@ let preoperacionales = [];
 // ── USUARIO ACTUAL ──
 let currentUser = null; // { cedula, nombre }
 
-const NAVS_SUPERADMIN = ["Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores","Usuarios"];
-const NAVS_TECNICO = ["Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
+const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores","Usuarios"];
+const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
 const $ = id => document.getElementById(id);
@@ -412,7 +412,8 @@ function renderNav() {
 
 function renderView() {
   const c = document.getElementById('content');
-  if (VIEW === 'Alertas') c.innerHTML = renderAlertas();
+  if (VIEW === 'Dashboard') c.innerHTML = renderDashboard();
+  else if (VIEW === 'Alertas') c.innerHTML = renderAlertas();
   else if (VIEW === 'Preoperacional') c.innerHTML = renderPreoperacional();
   else if (VIEW === 'Usuarios') c.innerHTML = renderUsuarios();
   else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
@@ -425,6 +426,169 @@ function renderView() {
 }
 
 window.setView = function(v) { VIEW = v; renderNav(); renderView(); }
+
+// ── DASHBOARD GERENCIAL ──
+function renderDashboard() {
+  const hoy = new Date();
+  const mesActual = hoy.getMonth();
+  const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
+  const anioActual = hoy.getFullYear();
+  const anioAnterior = mesActual === 0 ? anioActual - 1 : anioActual;
+
+  const MESES_N = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+  // Registros del mes actual y anterior
+  const regMesAct = registros.filter(r => {
+    const d = new Date(r.fecha);
+    return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+  });
+  const regMesAnt = registros.filter(r => {
+    const d = new Date(r.fecha);
+    return d.getMonth() === mesAnterior && d.getFullYear() === anioAnterior;
+  });
+
+  const costoAct = regMesAct.reduce((s,r) => s+(r.costo||0), 0);
+  const costoAnt = regMesAnt.reduce((s,r) => s+(r.costo||0), 0);
+  const diffCosto = costoAnt > 0 ? Math.round((costoAct - costoAnt) / costoAnt * 100) : 0;
+  const diffSign = diffCosto >= 0 ? '+' : '';
+  const diffColor = diffCosto > 10 ? 'var(--red)' : diffCosto < -10 ? 'var(--green-text)' : 'var(--amber)';
+
+  // Correctivos vs preventivos mes actual
+  const corrAct = regMesAct.filter(r => r.tipo === 'Correctivo').length;
+  const prevAct = regMesAct.filter(r => r.tipo !== 'Correctivo').length;
+
+  // Vehículos con más correctivos (todo el historial)
+  const corrPorVeh = {};
+  registros.filter(r => r.tipo === 'Correctivo').forEach(r => {
+    corrPorVeh[r.placa] = (corrPorVeh[r.placa] || 0) + 1;
+  });
+  const topCorr = Object.entries(corrPorVeh).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+  // Costo por vehículo mes actual
+  const costoPorVeh = {};
+  regMesAct.forEach(r => { costoPorVeh[r.placa] = (costoPorVeh[r.placa]||0) + (r.costo||0); });
+  const topCosto = Object.entries(costoPorVeh).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const maxCosto = topCosto.length > 0 ? topCosto[0][1] : 1;
+
+  // Alertas críticas
+  const criticos = [];
+  vehiculos.forEach(v => {
+    if (!v.km) return;
+    Object.keys(LABELS).forEach(k => {
+      if (!v.int[k]) return;
+      const f = getFaltante(v, k);
+      if (f !== null && f <= 0) criticos.push({placa: v.placa, item: LABELS[k], faltante: f});
+    });
+  });
+
+  // Preoperacionales hoy
+  const hoyStr = hoy.toISOString().split('T')[0];
+  const preoHoy = preoperacionales.filter(p => p.fecha === hoyStr);
+  const conNov = preoHoy.filter(p => p.noCumple > 0).length;
+  const sinPreo = vehiculos.length - preoHoy.length;
+
+  return '<style>' +
+    '.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px}' +
+    '@media(min-width:600px){.dash-grid{grid-template-columns:repeat(4,1fr)}}' +
+    '.dash-kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}' +
+    '.dash-kpi .label{font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px}' +
+    '.dash-kpi .value{font-size:28px;font-weight:700;line-height:1}' +
+    '.dash-kpi .sub{font-size:11px;margin-top:4px;color:var(--text-muted)}' +
+    '</style>' +
+
+    // KPIs principales
+    '<div class="dash-grid">' +
+      '<div class="dash-kpi">' +
+        '<div class="label">Costo ' + MESES_N[mesActual] + '</div>' +
+        '<div class="value" style="color:var(--green)">$' + Math.round(costoAct/1000) + 'K</div>' +
+        '<div class="sub" style="color:' + diffColor + '">' + diffSign + diffCosto + '% vs ' + MESES_N[mesAnterior] + '</div>' +
+      '</div>' +
+      '<div class="dash-kpi">' +
+        '<div class="label">Registros mes</div>' +
+        '<div class="value" style="color:var(--blue)">' + regMesAct.length + '</div>' +
+        '<div class="sub">' + prevAct + ' prev · ' + corrAct + ' corr</div>' +
+      '</div>' +
+      '<div class="dash-kpi">' +
+        '<div class="label">Alertas críticas</div>' +
+        '<div class="value" style="color:' + (criticos.length > 0 ? 'var(--red)' : 'var(--green-text)') + '">' + criticos.length + '</div>' +
+        '<div class="sub">Mantenimientos vencidos</div>' +
+      '</div>' +
+      '<div class="dash-kpi">' +
+        '<div class="label">Preop. hoy</div>' +
+        '<div class="value" style="color:' + (sinPreo > 0 ? 'var(--amber)' : 'var(--green-text)') + '">' + preoHoy.length + '/' + vehiculos.length + '</div>' +
+        '<div class="sub">' + (sinPreo > 0 ? sinPreo + ' sin reportar' : 'Todos reportaron') + (conNov > 0 ? ' · ' + conNov + ' con novedades' : '') + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Costo mes actual vs anterior
+    '<div class="card">' +
+      '<div class="card-header">' +
+        '<span>Comparativo de costos</span>' +
+        '<span style="font-size:12px;color:var(--text-muted)">' + MESES_N[mesAnterior] + ' vs ' + MESES_N[mesActual] + '</span>' +
+      '</div>' +
+      '<div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<div style="text-align:center">' +
+          '<div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">' + MESES_N[mesAnterior] + '</div>' +
+          '<div style="font-size:24px;font-weight:700;color:var(--text-muted)">$' + Math.round(costoAnt/1000) + 'K</div>' +
+          '<div style="font-size:12px;color:var(--text-muted)">' + regMesAnt.length + ' registros</div>' +
+        '</div>' +
+        '<div style="text-align:center">' +
+          '<div style="font-size:12px;color:var(--green-text);font-weight:600;margin-bottom:4px">' + MESES_N[mesActual] + ' (actual)</div>' +
+          '<div style="font-size:24px;font-weight:700;color:var(--green)">$' + Math.round(costoAct/1000) + 'K</div>' +
+          '<div style="font-size:12px;color:var(--text-muted)">' + regMesAct.length + ' registros</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Top 5 vehículos por costo este mes
+    (topCosto.length > 0 ? '<div class="card">' +
+      '<div class="card-header">Top vehículos por costo — ' + MESES_N[mesActual] + '</div>' +
+      topCosto.map(function(entry) {
+        const placa = entry[0], costo = entry[1];
+        const pct = Math.round((costo/maxCosto)*100);
+        const v = vehiculos.find(x => x.placa === placa);
+        return '<div class="row" style="flex-direction:column;align-items:stretch">' +
+          '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
+            '<div><span style="font-weight:600;font-size:13px">' + placa + '</span>' +
+            (v ? '<span style="font-size:11px;color:var(--text-muted);margin-left:8px">' + v.conductor + '</span>' : '') + '</div>' +
+            '<span style="font-weight:600;font-size:13px;color:var(--green)">$' + fmt(costo) + '</span>' +
+          '</div>' +
+          '<div class="bar-wrap"><div class="bar" style="width:' + pct + '%"></div></div>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // Top 5 vehículos con más correctivos
+    (topCorr.length > 0 ? '<div class="card">' +
+      '<div class="card-header">Vehículos con más correctivos (histórico)</div>' +
+      topCorr.map(function(entry) {
+        const placa = entry[0], cant = entry[1];
+        const v = vehiculos.find(x => x.placa === placa);
+        const pct = Math.round((cant/topCorr[0][1])*100);
+        return '<div class="row" style="flex-direction:column;align-items:stretch">' +
+          '<div style="display:flex;justify-content:space-between;margin-bottom:5px">' +
+            '<div><span style="font-weight:600;font-size:13px">' + placa + '</span>' +
+            (v ? '<span style="font-size:11px;color:var(--text-muted);margin-left:8px">' + v.conductor + '</span>' : '') + '</div>' +
+            '<span class="badge rojo">' + cant + ' correctivos</span>' +
+          '</div>' +
+          '<div class="bar-wrap"><div class="bar" style="width:' + pct + '%;background:var(--red)"></div></div>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '') +
+
+    // Alertas críticas vencidas
+    (criticos.length > 0 ? '<div class="card">' +
+      '<div class="card-header" style="color:var(--red)">⚠️ Mantenimientos vencidos (' + criticos.length + ')</div>' +
+      criticos.slice(0,8).map(function(a) {
+        return '<div class="row" style="justify-content:space-between">' +
+          '<div><span style="font-weight:600;font-size:13px">' + a.placa + '</span>' +
+          '<span style="font-size:12px;color:var(--text-muted);margin-left:8px">' + a.item + '</span></div>' +
+          '<span class="badge rojo">Vencido ' + fmt(Math.abs(a.faltante)) + ' km</span>' +
+        '</div>';
+      }).join('') +
+    '</div>' : '<div style="background:var(--green-light);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:13px;color:var(--green-text);font-weight:600">✓ Sin mantenimientos vencidos</div>');
+}
+
 
 // ── ALERTAS ──
 function renderAlertas() {
@@ -1014,7 +1178,13 @@ window.guardarRegistro = async function() {
   }
 
   facturaBase64 = null; facturaMediaType = null;
+  // Recargar registros desde Firebase para mostrar el nuevo
+  const rSnap2 = await getDocs(query(collection(db, 'registros'), orderBy('fecha', 'desc')));
+  registros = rSnap2.docs.map(d => ({ id: d.id, ...d.data() }));
   toast('Registro guardado ✓');
+  VIEW = 'Historial';
+  histPlaca = placa;
+  renderNav();
   renderView();
 }
 
