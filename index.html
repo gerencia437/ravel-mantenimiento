@@ -1211,7 +1211,10 @@ function renderHistorial() {
   }).join('') : '';
 
   return `
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+    ${btns}
+    <button onclick="recargarHistorial()" style="padding:5px 12px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid var(--green);background:var(--green-light);color:var(--green-text);font-weight:600;margin-left:auto">↻ Recargar</button>
+  </div>
   ${v ? `<div class="grid-4" style="margin-bottom:12px">
     ${[{l:'Tipo',v:v.tipo},{l:'Km actuales',v:v.km?fmt(v.km)+' km':'Sin km'},{l:'Prev./Pred.',v:prev},{l:'Correctivos',v:corr}].map(c=>`<div class="kpi"><label>${c.l}</label><span style="font-size:16px">${c.v}</span></div>`).join('')}
   </div>` : ''}
@@ -1243,6 +1246,13 @@ function renderHistorial() {
 }
 
 window.selHist = function(p) { histPlaca = p; renderView(); }
+
+window.recargarHistorial = async function() {
+  const rSnap = await getDocs(query(collection(db, 'registros'), orderBy('fecha', 'desc')));
+  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  toast('Historial actualizado ✓');
+  renderView();
+}
 
 window.eliminarRegistro = async function(id) {
   if (!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
