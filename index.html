@@ -223,6 +223,7 @@ window.doLogin = async function() {
   if (!cedula || cedula.length < 5) { errEl.textContent = 'Ingresa un número de cédula válido.'; errEl.style.display = 'block'; return; }
   if (!nombre || nombre.length < 3) { errEl.textContent = 'Ingresa tu nombre completo.'; errEl.style.display = 'block'; return; }
   // Guardar o actualizar usuario en Firebase
+  // Siempre leer rol desde Firebase (nunca del caché)
   const userSnap = await getDoc(doc(db, 'usuarios', cedula));
   let rol = 'conductor';
   if (userSnap.exists()) {
@@ -233,6 +234,7 @@ window.doLogin = async function() {
   }
   await setDoc(doc(db, 'usuarios', cedula), { cedula, nombre, ultimoAcceso: new Date().toISOString(), rol }, { merge: true });
   currentUser = { cedula, nombre, rol };
+  console.log('Login exitoso - rol:', rol);
   // Guardar en sessionStorage para no pedir en cada recarga
   sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
   document.getElementById('loginWrap').style.display = 'none';
@@ -258,7 +260,16 @@ function checkSession() {
   const saved = sessionStorage.getItem('ravelUser');
   if (saved) {
     try {
-      currentUser = JSON.parse(saved);
+      const savedUser = JSON.parse(saved);
+      // Siempre reverificar rol desde Firebase al recargar
+      try {
+        const freshSnap = await getDoc(doc(db, 'usuarios', savedUser.cedula));
+        if (freshSnap.exists()) {
+          savedUser.rol = freshSnap.data().rol || 'conductor';
+        }
+      } catch(e) { console.log('No se pudo reverificar rol:', e); }
+      currentUser = savedUser;
+      sessionStorage.setItem('ravelUser', JSON.stringify(currentUser));
       document.getElementById('loginWrap').style.display = 'none';
       document.getElementById('appWrap').style.display = 'block';
       const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
