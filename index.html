@@ -135,7 +135,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAmfFabMCKEDvZNdpIYA_HpIMAurpT_izg",
@@ -1052,14 +1052,20 @@ function renderHistorial() {
     </div>
     ${regs.length === 0 ? '<div class="empty">Sin registros</div>' :
       regs.map((r,i) => `
-        <div class="row" style="justify-content:space-between" key="${i}">
-          <div>
+        <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px" key="${i}">
+          <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500">${r.desc||r.tipo}</div>
             <div style="font-size:12px;color:#888;margin-top:2px">${r.fecha}${r.taller?' · '+r.taller:''}${r.km?' · '+fmt(r.km)+' km':''}${r.registradoPor?' · '+r.registradoPor:''}</div>
           </div>
-          <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
             <div style="font-weight:500;font-size:13px">${money(r.costo)}</div>
             <div class="tag ${r.tipo==='Correctivo'?'corr':r.tipo==='Predictivo'?'pred':'prev'}">${r.tipo}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button onclick="editarRegistro('${r.id}')" style="padding:3px 8px;font-size:11px;background:var(--blue-light);color:var(--blue);border:1px solid #c0d8f0;border-radius:5px;cursor:pointer;font-weight:600">Editar</button>
+            <button onclick="eliminarRegistro('${r.id}')" style="padding:3px 8px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:5px;cursor:pointer;font-weight:600">Borrar</button>
+          </div>
           </div>
         </div>`).join('')}
   </div>
@@ -1067,6 +1073,57 @@ function renderHistorial() {
 }
 
 window.selHist = function(p) { histPlaca = p; renderView(); }
+
+window.eliminarRegistro = async function(id) {
+  if (!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
+  await deleteDoc(doc(db, 'registros', id));
+  registros = registros.filter(r => r.id !== id);
+  toast('Registro eliminado ✓');
+  renderView();
+}
+
+window.editarRegistro = function(id) {
+  const r = registros.find(x => x.id === id);
+  if (!r) return;
+  // Crear modal de edición
+  const modal = document.createElement('div');
+  modal.id = 'editModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = '<div style="background:#fff;border-radius:14px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+    '<div style="background:var(--green);padding:16px 20px;color:#fff;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center">' +
+      'Editar registro <button onclick="document.getElementById('editModal').remove()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px">×</button>' +
+    '</div>' +
+    '<div style="padding:16px;display:flex;flex-direction:column;gap:10px">' +
+      '<input id="eDesc" value="' + (r.desc||'').replace(/"/g,"'") + '" placeholder="Descripción" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+      '<input id="eFecha" type="date" value="' + (r.fecha||'') + '" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+      '<input id="eKm" type="number" value="' + (r.km||0) + '" placeholder="Km" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+      '<input id="eCosto" type="number" value="' + (r.costo||0) + '" placeholder="Costo ($)" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+      '<input id="eTaller" value="' + (r.taller||'').replace(/"/g,"'") + '" placeholder="Taller/proveedor" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+      '<select id="eTipo" style="font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border)">' +
+        '<option ' + (r.tipo==='Preventivo'?'selected':'') + '>Preventivo</option>' +
+        '<option ' + (r.tipo==='Correctivo'?'selected':'') + '>Correctivo</option>' +
+        '<option ' + (r.tipo==='Predictivo'?'selected':'') + '>Predictivo</option>' +
+      '</select>' +
+      '<button onclick="guardarEdicion('' + id + '')" style="padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Guardar cambios</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(modal);
+}
+
+window.guardarEdicion = async function(id) {
+  const desc = document.getElementById('eDesc').value;
+  const fecha = document.getElementById('eFecha').value;
+  const km = parseInt(document.getElementById('eKm').value) || 0;
+  const costo = parseInt(document.getElementById('eCosto').value) || 0;
+  const taller = document.getElementById('eTaller').value;
+  const tipo = document.getElementById('eTipo').value;
+  await setDoc(doc(db, 'registros', id), { desc, fecha, km, costo, taller, tipo }, { merge: true });
+  const idx = registros.findIndex(r => r.id === id);
+  if (idx >= 0) Object.assign(registros[idx], { desc, fecha, km, costo, taller, tipo });
+  document.getElementById('editModal').remove();
+  toast('Registro actualizado ✓');
+  renderView();
+}
 
 // ── INFORME MENSUAL ──
 function renderInforme() {
@@ -1196,6 +1253,7 @@ function renderUsuarios() {
               '<option value="tecnico" ' + (u.rol==='tecnico'?'selected':'') + '>Técnico</option>' +
               '<option value="superadmin" ' + (u.rol==='superadmin'?'selected':'') + '>Super Admin</option>' +
             '</select>' : '') +
+            (!esYo ? '<button onclick="eliminarUsuario(\'' + u.cedula + '\',\'' + u.nombre + '\')" style="padding:5px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer;font-weight:600">Eliminar</button>' : '') +
           '</div>' +
         '</div>';
       }).join('')
@@ -1208,6 +1266,14 @@ window.cambiarRol = async function(cedula, nuevoRol) {
   const idx = usuariosLista.findIndex(u => u.cedula === cedula);
   if (idx >= 0) usuariosLista[idx].rol = nuevoRol;
   toast('Rol actualizado ✓');
+  renderView();
+}
+
+window.eliminarUsuario = async function(cedula, nombre) {
+  if (!confirm('¿Eliminar al usuario ' + nombre + '? Esta acción no se puede deshacer.')) return;
+  await deleteDoc(doc(db, 'usuarios', cedula));
+  usuariosLista = usuariosLista.filter(u => u.cedula !== cedula);
+  toast('Usuario eliminado ✓');
   renderView();
 }
 
