@@ -279,7 +279,17 @@ async function checkSession() {
     } catch(e) { sessionStorage.removeItem('ravelUser'); }
   }
 }
-checkSession();
+// checkSession ya es async - llamarla correctamente
+checkSession().then(() => {
+  if (currentUser) {
+    initData();
+    if (currentUser.rol === 'superadmin') {
+      getDocs(collection(db, 'usuarios')).then(snap => {
+        usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
+      });
+    }
+  }
+});
 
 function toast(msg) {
   const t = $('toast');
@@ -1180,14 +1190,7 @@ window.cambiarRol = async function(cedula, nuevoRol) {
 function bindEvents() {}
 
 // Solo iniciar si ya hay sesión activa
-if (currentUser) {
-  initData();
-  if (currentUser.rol === 'superadmin') {
-    getDocs(collection(db, 'usuarios')).then(snap => {
-      usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
-    });
-  }
-}
+
 </script>
 </body>
 </html>
