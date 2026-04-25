@@ -1164,6 +1164,8 @@ let usuariosLista = [];
 async function cargarUsuarios() {
   const snap = await getDocs(collection(db, 'usuarios'));
   usuariosLista = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  VIEW = 'Usuarios';
+  renderNav();
   renderView();
 }
 
