@@ -203,11 +203,12 @@ let histPlaca = "";
 let mesInf = new Date().getMonth();
 let conductoresData = [];
 let pendingImport = [];
+let preoperacionales = [];
 
 // ── USUARIO ACTUAL ──
 let currentUser = null; // { cedula, nombre }
 
-const NAVS = ["Alertas","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
+const NAVS = ["Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
 
 const $ = id => document.getElementById(id);
 const fmt = n => n?.toLocaleString('es-CO') ?? '—';
@@ -315,6 +316,14 @@ async function initData() {
   const tSnap = await getDoc(doc(db, 'config', 'talleres'));
   if (tSnap.exists()) talleres = tSnap.data().lista;
 
+  // Preoperacionales recientes (últimos 30 días)
+  const hoy = new Date();
+  const hace30 = new Date(hoy - 30*24*60*60*1000).toISOString().split("T")[0];
+  try {
+    const pSnap = await getDocs(query(collection(db, "preoperacionales"), orderBy("fecha","desc")));
+    preoperacionales = pSnap.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
+  } catch(e) { preoperacionales = []; }
+
   histPlaca = vehiculos[0]?.placa || '';
   document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · ${currentUser ? currentUser.nombre : ''} · 2026`;
   renderNav();
@@ -353,6 +362,7 @@ function renderNav() {
 function renderView() {
   const c = document.getElementById('content');
   if (VIEW === 'Alertas') c.innerHTML = renderAlertas();
+  else if (VIEW === 'Preoperacional') c.innerHTML = renderPreoperacional();
   else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
   else if (VIEW === 'Km base') c.innerHTML = renderKmBase();
   else if (VIEW === 'Registro') c.innerHTML = renderRegistro();
@@ -379,6 +389,22 @@ function renderAlertas() {
   });
   alertas.sort((a, b) => (a.faltante ?? 99999) - (b.faltante ?? 99999));
 
+  // Novedades preoperacional hoy
+  const hoy2 = new Date().toISOString().split("T")[0];
+  const preoHoy = preoperacionales.filter(p => p.fecha === hoy2 && p.noCumple > 0);
+  const preoHoyHTML = preoHoy.length > 0 ?
+    '<div class="alert-box" style="margin-bottom:16px">' +
+      '<div class="title">⚠️ Novedades preoperacional hoy (' + preoHoy.length + ' vehículos)</div>' +
+      preoHoy.map(p =>
+        '<div class="alert-row">' +
+          '<div><span style="font-weight:600">' + p.placa + '</span><span style="font-size:11px;color:#888;margin-left:8px">' + p.conductor + '</span>' +
+          p.novedades.map(n => '<div style="font-size:12px;color:var(--red);margin-top:2px">• ' + n.item + ': ' + n.obs + '</div>').join('') +
+          '</div>' +
+          '<div class="badge rojo">' + p.noCumple + ' novedad(es)</div>' +
+        '</div>'
+      ).join('') +
+    '</div>' : '';
+
   const rojos = alertas.filter(a => a.estado === 'rojo').length;
   const amarillos = alertas.filter(a => a.estado === 'amarillo').length;
   const verdes = alertas.filter(a => a.estado === 'verde').length;
@@ -391,7 +417,7 @@ function renderAlertas() {
     {l:'Sin km',v:sinKm,c:'#185FA5',bg:'#E6F1FB',k:'sin'},
   ];
 
-  return `
+  return preoHoyHTML + `
   <div class="grid-4">
     ${kpis.map(k => `
       <div class="kpi ${alertFiltro===k.k?'selected':''}" style="background:${alertFiltro===k.k?k.bg:'#f5f5f0'};color:${k.c}" onclick="filtrarAlerta('${k.k}')">
@@ -399,11 +425,7 @@ function renderAlertas() {
         <span>${k.v}</span>
       </div>`).join('')}
   </div>
-  <div style="display:flex;gap:8px;margin-bottom:14px">
-    <select id="kmPlaca" style="flex:1"><option value="">Actualizar km de vehículo...</option>${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.km?fmt(v.km)+' km':'sin km'}</option>`).join('')}</select>
-    <input type="number" id="kmNuevo" placeholder="Km nuevo" style="width:130px"/>
-    <button class="btn btn-sm" onclick="actualizarKm()">Actualizar</button>
-  </div>
+
   <div class="card">
     <div class="card-header"><span>Alertas por kilometraje</span><span style="font-size:11px;color:#888">${alertas.length} ítems</span></div>
     ${alertas.length === 0 ? '<div class="empty">No hay alertas en este filtro</div>' :
@@ -434,6 +456,182 @@ window.actualizarKm = async function() {
   toast('Km actualizado');
   renderView();
 }
+
+// ── PREOPERACIONAL ──
+const PREO_DOCS = [
+  "LICENCIA DE TRANSITO",
+  "TARJETA DE OPERACION",
+  "SOAT",
+  "REVISION TECNICO MECANICA",
+  "POLIZA RCC",
+  "POLIZA RCE",
+  "LICENCIA DE CONDUCCION"
+];
+
+const PREO_MECANICO = [
+  "CAJA DE CAMBIOS / TRANSMISION",
+  "SUSPENSION / DIRECCION",
+  "NIVEL AGUA, ACEITE, COMBUSTIBLE Y FLUIDOS",
+  "FUGAS DEL MOTOR",
+  "CORREAS",
+  "CONEXIONES ELECTRICAS",
+  "ESPEJO CENTRAL CONVEXO",
+  "ESPEJOS LATERALES",
+  "ALARMA DE RETROCESO Y PITO",
+  "TAPAS",
+  "FRENO DE SERVICIO",
+  "FRENO DE EMERGENCIA",
+  "VIDRIO FRONTAL / LIMPIABRISAS",
+  "BOTIQUIN, EQUIPO DE CARRETERA",
+  "EXTINTOR DE INCENDIOS",
+  "ASIENTOS Y TAPICERIA",
+  "SENSORES TABLERO (KM/H, BATERIA, TEMPERATURA, COMBUSTIBLE)",
+  "ESTRIBO",
+  "BATERIA, BORNES, CABLES, NIV. DE ELECTROLITO Y SULFATACION",
+  "EXTERIORES ALTAS Y BAJAS",
+  "DIRECCIONALES DELANTERAS",
+  "DIRECCIONALES TRASERAS",
+  "LUCES DE ESTACIONAMIENTO",
+  "LUCES DE STOP",
+  "ESTADO GENERAL DE LAS LLANTAS",
+  "PRESION DEL AIRE",
+  "LLANTA DE REPUESTO"
+];
+
+let preoData = {};
+
+function renderPreoperacional() {
+  const today = new Date().toISOString().split("T")[0];
+  const v = vehiculos.find(x => x.placa === (preoData.placa || vehiculos[0].placa));
+  const placaSel = preoData.placa || vehiculos[0].placa;
+
+  const docsRows = PREO_DOCS.map((item, i) => {
+    const key = "doc_" + i;
+    const val = preoData[key] || "cumple";
+    const obs = preoData[key + "_obs"] || "";
+    return "<div class=\"preo-row\">" +
+      "<div class=\"preo-item\">" + item + "</div>" +
+      "<div class=\"preo-btns\">" +
+        "<button class=\"preo-btn " + (val === "cumple" ? "active-verde" : "") + "\" onclick=\"preoSet('" + key + "','cumple')\">Cumple</button>" +
+        "<button class=\"preo-btn " + (val === "nocumple" ? "active-rojo" : "") + "\" onclick=\"preoSet('" + key + "','nocumple')\">No Cumple</button>" +
+      "</div>" +
+      (val === "nocumple" ? "<div style=\"grid-column:1/-1;padding:4px 0\"><input placeholder=\"Describe la novedad...\" value=\"" + obs + "\" oninput=\"preoObs('" + key + "',this.value)\" style=\"font-size:12px;border-color:var(--red)\"/></div>" : "") +
+    "</div>";
+  }).join("");
+
+  const mecRows = PREO_MECANICO.map((item, i) => {
+    const key = "mec_" + i;
+    const val = preoData[key] || "cumple";
+    const obs = preoData[key + "_obs"] || "";
+    return "<div class=\"preo-row\">" +
+      "<div class=\"preo-item\">" + item + "</div>" +
+      "<div class=\"preo-btns\">" +
+        "<button class=\"preo-btn " + (val === "cumple" ? "active-verde" : "") + "\" onclick=\"preoSet('" + key + "','cumple')\">Cumple</button>" +
+        "<button class=\"preo-btn " + (val === "nocumple" ? "active-rojo" : "") + "\" onclick=\"preoSet('" + key + "','nocumple')\">No Cumple</button>" +
+      "</div>" +
+      (val === "nocumple" ? "<div style=\"grid-column:1/-1;padding:4px 0\"><input placeholder=\"Describe la novedad...\" value=\"" + obs + "\" oninput=\"preoObs('" + key + "',this.value)\" style=\"font-size:12px;border-color:var(--red)\"/></div>" : "") +
+    "</div>";
+  }).join("");
+
+  const nocumples = Object.keys(preoData).filter(k => preoData[k] === "nocumple").length;
+
+  return "<style>" +
+    ".preo-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;padding:10px 16px;border-bottom:1px solid var(--border)}" +
+    ".preo-row:last-child{border-bottom:none}" +
+    ".preo-item{font-size:12px;font-weight:500;color:var(--text);padding-top:6px}" +
+    ".preo-btns{display:flex;gap:6px;flex-shrink:0}" +
+    ".preo-btn{padding:5px 12px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--text-muted);transition:all 0.15s;font-family:inherit}" +
+    ".active-verde{background:var(--green-light);color:var(--green-text);border-color:var(--green)}" +
+    ".active-rojo{background:var(--red-light);color:var(--red);border-color:var(--red)}" +
+    "</style>" +
+    "<div class=\"card\">" +
+      "<div class=\"card-header\">Preoperacional diario</div>" +
+      "<div style=\"padding:14px\"><div class=\"grid-2\" style=\"gap:10px\">" +
+        "<select id=\"preoPlaca\" onchange=\"preoPlacaChange(this.value)\">" +
+          vehiculos.map(v => "<option value=\"" + v.placa + "\" " + (v.placa === placaSel ? "selected" : "") + ">" + v.placa + " — " + v.conductor + "</option>").join("") +
+        "</select>" +
+        "<input type=\"number\" id=\"preoKm\" placeholder=\"Kilometraje actual\" value=\"" + (preoData.km || "") + "\" oninput=\"preoData.km=this.value\">" +
+        "<input type=\"date\" id=\"preoFecha\" value=\"" + today + "\" style=\"grid-column:1/-1\">" +
+      "</div></div>" +
+    "</div>" +
+    (nocumples > 0 ? "<div style=\"background:var(--red-light);border:1px solid #f0bebe;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--red);font-weight:600\">⚠️ " + nocumples + " novedad(es) registrada(s) — se enviarán alertas a gerencia</div>" : "") +
+    "<div class=\"card\">" +
+      "<div class=\"card-header\">Documentos del vehículo</div>" +
+      docsRows +
+    "</div>" +
+    "<div class=\"card\">" +
+      "<div class=\"card-header\">Revisión mecánica y de seguridad</div>" +
+      mecRows +
+    "</div>" +
+    "<button class=\"btn\" style=\"width:100%;margin-bottom:20px\" onclick=\"guardarPreoperacional()\">Guardar preoperacional</button>";
+}
+
+window.preoPlacaChange = function(placa) {
+  preoData = { placa };
+  renderView();
+}
+
+window.preoSet = function(key, val) {
+  preoData[key] = val;
+  if (val === "cumple") delete preoData[key + "_obs"];
+  renderView();
+}
+
+window.preoObs = function(key, val) {
+  preoData[key + "_obs"] = val;
+}
+
+window.guardarPreoperacional = async function() {
+  const placa = document.getElementById("preoPlaca").value;
+  const km = parseInt(document.getElementById("preoKm").value) || 0;
+  const fecha = document.getElementById("preoFecha").value;
+
+  if (!placa || !fecha) { toast("Selecciona vehículo y fecha"); return; }
+  if (!km) { toast("Ingresa el kilometraje"); return; }
+
+  // Validar km vs día anterior
+  const ayer = new Date(fecha);
+  ayer.setDate(ayer.getDate() - 1);
+  const ayerStr = ayer.toISOString().split("T")[0];
+  const v = vehiculos.find(x => x.placa === placa);
+  if (v && km < (v.km || 0)) {
+    toast("El km no puede ser menor al registrado anteriormente (" + fmt(v.km) + " km)");
+    return;
+  }
+
+  // Construir novedades
+  const novedades = [];
+  [...PREO_DOCS, ...PREO_MECANICO].forEach((item, i) => {
+    const key = i < PREO_DOCS.length ? "doc_" + i : "mec_" + (i - PREO_DOCS.length);
+    if (preoData[key] === "nocumple") {
+      novedades.push({ item, obs: preoData[key + "_obs"] || "Sin descripción" });
+    }
+  });
+
+  const total = PREO_DOCS.length + PREO_MECANICO.length;
+  const cumple = total - novedades.length;
+
+  const reg = {
+    placa, km, fecha,
+    conductor: v ? v.conductor : "",
+    cedulaRegistro: currentUser ? currentUser.cedula : "",
+    registradoPor: currentUser ? currentUser.nombre : "",
+    novedades,
+    totalItems: total,
+    cumple,
+    noCumple: novedades.length,
+    resultado: novedades.length === 0 ? "CUMPLE" : "CON NOVEDADES",
+    ts: Date.now()
+  };
+
+  await addDoc(collection(db, "preoperacionales"), reg);
+  if (km > (v.km || 0)) await saveVehiculo(placa, { km });
+
+  preoData = {};
+  toast(novedades.length === 0 ? "Preoperacional guardado ✓" : "Guardado con " + novedades.length + " novedad(es)");
+  renderView();
+};
+
 
 // ── IMPORTAR KM ──
 function renderImportar() {
@@ -544,6 +742,7 @@ function renderKmBase() {
   }).join('');
 
   return `
+  <div class="card" style="margin-bottom:16px"><div class="card-header">Actualización rápida de km</div><div style="padding:14px"><div style="display:flex;gap:8px"><select id="kmPlaca" style="flex:1"><option value="">Seleccionar vehículo...</option>${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.km?fmt(v.km)+' km':'sin km'}</option>`).join('')}</select><input type="number" id="kmNuevo" placeholder="Km nuevo" style="width:130px"/><button class="btn btn-sm" onclick="actualizarKm()">Actualizar</button></div></div></div>
   <div style="font-size:13px;color:#888;margin-bottom:12px">Ingresa el km del último mantenimiento por vehículo. Se guarda automáticamente.</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>
   <div class="card">
