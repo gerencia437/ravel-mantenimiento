@@ -419,7 +419,7 @@ function renderView() {
   else if (VIEW === 'Usuarios') c.innerHTML = renderUsuarios();
   else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
   else if (VIEW === 'Km base') c.innerHTML = renderKmBase();
-  else if (VIEW === 'Registro') c.innerHTML = renderRegistro();
+  else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
   else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
   else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
   else if (VIEW === 'Conductores') c.innerHTML = renderConductores();
@@ -987,6 +987,17 @@ window.updateKmBaseField = async function(placa, k, val) {
 }
 
 // ── REGISTRO ──
+async function recargarYRenderRegistro() {
+  const c = document.getElementById('content');
+  // Recargar últimos registros desde Firebase
+  try {
+    const rSnap = await getDocs(query(collection(db, 'registros'), orderBy('fecha', 'desc')));
+    registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) {}
+  c.innerHTML = renderRegistro();
+  bindEvents();
+}
+
 function renderRegistro() {
   const ultimos = registros.slice(0, 8);
   return `
