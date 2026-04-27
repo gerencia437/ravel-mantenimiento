@@ -209,8 +209,8 @@ let preoperacionales = [];
 // ── USUARIO ACTUAL ──
 let currentUser = null; // { cedula, nombre }
 
-const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores","Usuarios"];
-const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Informe mensual","Conductores"];
+const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Programación","Informe mensual","Conductores","Usuarios"];
+const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Programación","Informe mensual","Conductores"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
 const $ = id => document.getElementById(id);
@@ -421,6 +421,7 @@ function renderView() {
   else if (VIEW === 'Km base') c.innerHTML = renderKmBase();
   else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
   else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
+  else if (VIEW === 'Programación') { renderProgramacion(); return; }
   else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
   else if (VIEW === 'Conductores') c.innerHTML = renderConductores();
   bindEvents();
@@ -861,6 +862,185 @@ window.guardarPreoperacional = async function() {
 };
 
 
+// ── PROGRAMACIÓN DE TALLER ──
+let programaciones = [];
+let progCargadas = false;
+
+async function renderProgramacion() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loading">Cargando programaciones...</div>';
+
+  // Cargar desde Firebase
+  try {
+    const snap = await getDocs(collection(db, 'programaciones'));
+    programaciones = snap.docs.map(d => ({id: d.id, ...d.data()}))
+      .sort((a,b) => (a.fechaEstimada||'').localeCompare(b.fechaEstimada||''));
+  } catch(e) { programaciones = []; }
+
+  const hoy = new Date().toISOString().split('T')[0];
+  const pendientes = programaciones.filter(p => p.estado !== 'Completado');
+  const completados = programaciones.filter(p => p.estado === 'Completado');
+
+  const canEdit = currentUser && (currentUser.rol === 'superadmin' || currentUser.rol === 'tecnico');
+
+  c.innerHTML =
+    // Formulario nuevo (solo admin/tecnico)
+    (canEdit ? '<div class="card">' +
+      '<div class="card-header">Nueva programación de taller</div>' +
+      '<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<select id="pPlaca"><option value="">Seleccionar vehículo</option>' +
+          vehiculos.map(v => '<option value="' + v.placa + '">' + v.placa + ' — ' + v.conductor + '</option>').join('') +
+        '</select>' +
+        '<input type="date" id="pFecha" min="' + hoy + '" placeholder="Fecha estimada"/>' +
+        '<input id="pMotivo" placeholder="Motivo / trabajo a realizar" style="grid-column:1/-1"/>' +
+        '<select id="pTaller"><option value="">Seleccionar taller</option>' +
+          talleres.map(t => '<option>' + t + '</option>').join('') +
+        '</select>' +
+        '<select id="pPrioridad"><option value="Normal">Prioridad Normal</option><option value="Urgente">Urgente</option><option value="Programado">Programado</option></select>' +
+        '<textarea id="pObs" placeholder="Observaciones adicionales..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>' +
+        '<button class="btn" style="grid-column:1/-1" onclick="guardarProgramacion()">Programar vehículo</button>' +
+      '</div>' +
+    '</div>' : '') +
+
+    // Botón compartir con operaciones
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+      '<div style="font-size:13px;font-weight:600;color:var(--text)">' + pendientes.length + ' vehículos programados</div>' +
+      '<button onclick="compartirOperaciones()" style="padding:6px 14px;font-size:12px;background:#25D366;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">📤 Compartir con Operaciones</button>' +
+    '</div>' +
+
+    // Lista de pendientes
+    (pendientes.length === 0 ? '<div class="empty" style="background:#fff;border-radius:12px;border:1px solid var(--border);margin-bottom:14px">No hay vehículos programados</div>' :
+      '<div class="card" style="margin-bottom:14px">' +
+        '<div class="card-header">Pendientes y en curso</div>' +
+        pendientes.map(p => {
+          const v = vehiculos.find(x => x.placa === p.placa);
+          const diasFaltan = Math.ceil((new Date(p.fechaEstimada) - new Date(hoy)) / 86400000);
+          const urgColor = p.prioridad === 'Urgente' ? 'var(--red)' : diasFaltan <= 2 ? 'var(--amber)' : 'var(--green-text)';
+          const urgBg = p.prioridad === 'Urgente' ? 'var(--red-light)' : diasFaltan <= 2 ? 'var(--amber-light)' : 'var(--green-light)';
+          return '<div class="row" style="flex-wrap:wrap;gap:8px;justify-content:space-between">' +
+            '<div style="flex:1;min-width:200px">' +
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+                '<span style="font-weight:700;font-size:14px">' + p.placa + '</span>' +
+                '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:' + urgBg + ';color:' + urgColor + '">' + (p.prioridad||'Normal') + '</span>' +
+              '</div>' +
+              '<div style="font-size:13px;color:var(--text);margin-bottom:2px">' + (p.motivo||'') + '</div>' +
+              '<div style="font-size:12px;color:var(--text-muted)">' +
+                '📅 ' + p.fechaEstimada + (diasFaltan >= 0 ? ' · En ' + diasFaltan + ' día(s)' : ' · VENCIDO') +
+                (p.taller ? ' · 🔧 ' + p.taller : '') +
+                (v ? ' · 👤 ' + v.conductor : '') +
+              '</div>' +
+              (p.obs ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">' + p.obs + '</div>' : '') +
+            '</div>' +
+            (canEdit ? '<div style="display:flex;gap:6px;align-items:center">' +
+              '<button onclick="completarProg('' + p.id + '')" style="padding:5px 10px;font-size:11px;background:var(--green-light);color:var(--green-text);border:1px solid var(--green);border-radius:6px;cursor:pointer;font-weight:600">✓ Completado</button>' +
+              '<button onclick="eliminarProg('' + p.id + '')" style="padding:5px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer;font-weight:600">Eliminar</button>' +
+            '</div>' : '') +
+          '</div>';
+        }).join('') +
+      '</div>'
+    ) +
+
+    // Completados recientes
+    (completados.length > 0 ?
+      '<div class="card">' +
+        '<div class="card-header" style="color:var(--text-muted)">Completados recientes (' + completados.length + ')</div>' +
+        completados.slice(0,5).map(p =>
+          '<div class="row" style="opacity:0.6">' +
+            '<div style="flex:1">' +
+              '<span style="font-weight:600;font-size:13px">' + p.placa + '</span>' +
+              '<span style="font-size:12px;color:var(--text-muted);margin-left:8px">' + p.fechaEstimada + '</span>' +
+              '<div style="font-size:12px;color:var(--text-muted)">' + (p.motivo||'') + '</div>' +
+            '</div>' +
+            '<span style="font-size:11px;background:var(--green-light);color:var(--green-text);padding:2px 8px;border-radius:20px;font-weight:600">✓ Completado</span>' +
+          '</div>'
+        ).join('') +
+      '</div>' : '');
+
+  bindEvents();
+}
+
+window.guardarProgramacion = async function() {
+  const placa = document.getElementById('pPlaca').value;
+  const fecha = document.getElementById('pFecha').value;
+  const motivo = document.getElementById('pMotivo').value;
+  const taller = document.getElementById('pTaller').value;
+  const prioridad = document.getElementById('pPrioridad').value;
+  const obs = document.getElementById('pObs').value;
+
+  if (!placa || !fecha || !motivo) { toast('Completa placa, fecha y motivo'); return; }
+
+  const v = vehiculos.find(x => x.placa === placa);
+  await addDoc(collection(db, 'programaciones'), {
+    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs,
+    conductor: v ? v.conductor : '',
+    estado: 'Pendiente',
+    creadoPor: currentUser ? currentUser.nombre : '',
+    ts: Date.now()
+  });
+  toast('Programación guardada ✓');
+  renderProgramacion();
+}
+
+window.completarProg = async function(id) {
+  await setDoc(doc(db, 'programaciones', id), { estado: 'Completado', completadoEn: new Date().toISOString() }, { merge: true });
+  toast('Marcado como completado ✓');
+  renderProgramacion();
+}
+
+window.eliminarProg = async function(id) {
+  if (!confirm('¿Eliminar esta programación?')) return;
+  await deleteDoc(doc(db, 'programaciones', id));
+  toast('Programación eliminada ✓');
+  renderProgramacion();
+}
+
+window.compartirOperaciones = function() {
+  const pendientes = programaciones.filter(p => p.estado !== 'Completado');
+  if (pendientes.length === 0) { toast('No hay programaciones pendientes'); return; }
+
+  const hoy = new Date().toLocaleDateString('es-CO');
+  let msg = '*TRANSPORTE RAVEL — Programación de Taller*
+';
+  msg += '_Actualizado: ' + hoy + '_
+
+';
+
+  pendientes.forEach(p => {
+    msg += '🚌 *' + p.placa + '*';
+    if (p.conductor) msg += ' — ' + p.conductor;
+    msg += '
+';
+    msg += '📅 Fecha: ' + p.fechaEstimada + '
+';
+    msg += '🔧 Trabajo: ' + p.motivo + '
+';
+    if (p.taller) msg += '🏪 Taller: ' + p.taller + '
+';
+    if (p.prioridad && p.prioridad !== 'Normal') msg += '⚠️ Prioridad: ' + p.prioridad + '
+';
+    if (p.obs) msg += '📝 ' + p.obs + '
+';
+    msg += '
+';
+  });
+
+  msg += '_Transporte Ravel — Control de Mantenimiento_';
+
+  navigator.clipboard.writeText(msg).then(() => {
+    toast('Mensaje copiado — pégalo en WhatsApp ✓');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = msg;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Mensaje copiado ✓');
+  });
+}
+
+
 // ── IMPORTAR KM ──
 function renderImportar() {
   return `
@@ -999,7 +1179,7 @@ async function recargarYRenderRegistro() {
 }
 
 function renderRegistro() {
-  const ultimos = [...registros].sort((a,b) => (b.fecha||"").localeCompare(a.fecha||"")).slice(0, 10);
+  const ultimos = [...registros].sort((a,b) => (b.ts||0)-(a.ts||0)).slice(0, 10);
   return `
 
   <div class="card">
