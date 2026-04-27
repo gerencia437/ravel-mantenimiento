@@ -1294,8 +1294,7 @@ window.exportarExcel = function() {
       r.placa || '',
       r.fecha || '',
       r.tipo || '',
-      (r.desc || '').replace(/,/g,';').replace(/
-/g,' '),
+      (r.desc || '').replace(/,/g,';').replace(/\n/g,' '),
       r.km > 0 ? r.km : '',
       r.costo > 0 ? r.costo : '',
       (r.taller || '').replace(/,/g,';'),
