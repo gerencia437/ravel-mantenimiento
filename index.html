@@ -199,6 +199,7 @@ let registros = [];
 let kmBase = {};
 let talleres = [...TALLERES_SEED];
 let alertFiltro = "todos";
+let alertPlaca = "todas";
 let histPlaca = "";
 let mesInf = new Date().getMonth();
 let conductoresData = [];
@@ -599,7 +600,7 @@ function renderAlertas() {
       if (!v.int[k]) return;
       const f = getFaltante(v, k);
       const est = estadoBadge(f);
-      if (alertFiltro === 'todos' || alertFiltro === est)
+      if ((alertFiltro === 'todos' || alertFiltro === est) && (alertPlaca === 'todas' || alertPlaca === v.placa))
         alertas.push({ placa: v.placa, conductor: v.conductor, item: LABELS[k], faltante: f, proximo: getProximo(v, k), estado: est });
     });
   });
@@ -642,6 +643,12 @@ function renderAlertas() {
       </div>`).join('')}
   </div>
 
+  <div style="margin-bottom:12px">
+    <select id="alertPlacaSel" onchange="filtrarPlaca(this.value)" style="width:100%">
+      <option value="todas">Todas las placas</option>
+      ${vehiculos.map(v=>`<option value="${v.placa}" ${alertPlaca===v.placa?'selected':''}>${v.placa} — ${v.conductor}</option>`).join('')}
+    </select>
+  </div>
   <div class="card">
     <div class="card-header"><span>Alertas por kilometraje</span><span style="font-size:11px;color:#888">${alertas.length} ítems</span></div>
     ${alertas.length === 0 ? '<div class="empty">No hay alertas en este filtro</div>' :
@@ -661,6 +668,11 @@ function renderAlertas() {
 
 window.filtrarAlerta = function(k) {
   alertFiltro = alertFiltro === k ? 'todos' : k;
+  renderView();
+}
+
+window.filtrarPlaca = function(placa) {
+  alertPlaca = placa;
   renderView();
 }
 
@@ -1252,7 +1264,7 @@ window.selHist = function(p) { histPlaca = p; renderView(); }
 // ── EXPORTAR EXCEL ──
 window.exportarExcel = function() {
   // Construir CSV con BOM para Excel
-  const cols = ['Placa','Tipo Vehiculo','Marca','Modelo','Conductor','Celular','Fecha','Tipo Mant.','Descripcion','Km','Costo','Taller','Registrado Por'];
+  const cols = ['Placa','Fecha','Tipo Mant.','Descripcion','Km','Costo','Taller','Conductor','Registrado Por'];
   const rows = [cols];
 
   // Ordenar registros por placa y fecha
@@ -1266,17 +1278,13 @@ window.exportarExcel = function() {
     const v = vehiculos.find(x => x.placa === r.placa);
     rows.push([
       r.placa || '',
-      v ? v.tipo : '',
-      v ? v.marca : '',
-      v ? v.modelo : '',
-      v ? v.conductor : (r.conductor || ''),
-      v ? v.cel : '',
       r.fecha || '',
       r.tipo || '',
       (r.desc || '').replace(/,/g, ';'),
       r.km || 0,
       r.costo || 0,
       (r.taller || '').replace(/,/g, ';'),
+      v ? v.conductor : (r.conductor || ''),
       (r.registradoPor || '')
     ]);
   });
