@@ -997,6 +997,74 @@ window.eliminarProg = async function(id) {
 window.compartirOperaciones = function() {
   const pendientes = programaciones.filter(p => p.estado !== 'Completado');
   if (pendientes.length === 0) { toast('No hay programaciones pendientes'); return; }
+  const hoy = new Date().toLocaleDateString('es-CO');
+  const lineas = [];
+  lineas.push('TRANSPORTE RAVEL - Programacion de Taller');
+  lineas.push('Actualizado: ' + hoy);
+  lineas.push('');
+  pendientes.forEach(function(p) {
+    lineas.push('Vehiculo: ' + p.placa + (p.conductor ? ' - ' + p.conductor : ''));
+    lineas.push('Fecha estimada: ' + p.fechaEstimada);
+    lineas.push('Trabajo: ' + p.motivo);
+    if (p.taller) lineas.push('Taller: ' + p.taller);
+    if (p.prioridad && p.prioridad !== 'Normal') lineas.push('Prioridad: ' + p.prioridad);
+    if (p.obs) lineas.push('Obs: ' + p.obs);
+    lineas.push('');
+  });
+  lineas.push('Transporte Ravel - Control de Mantenimiento');
+  const msg = lineas.join('\n');
+  navigator.clipboard.writeText(msg).then(function() {
+    toast('Mensaje copiado - pegalo en WhatsApp');
+  }).catch(function() {
+    const ta = document.createElement('textarea');
+    ta.value = msg;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Mensaje copiado');
+  });
+}
+
+
+window.guardarProgramacion = async function() {
+  const placa = document.getElementById('pPlaca').value;
+  const fecha = document.getElementById('pFecha').value;
+  const motivo = document.getElementById('pMotivo').value;
+  const taller = document.getElementById('pTaller').value;
+  const prioridad = document.getElementById('pPrioridad').value;
+  const obs = document.getElementById('pObs').value;
+
+  if (!placa || !fecha || !motivo) { toast('Completa placa, fecha y motivo'); return; }
+
+  const v = vehiculos.find(x => x.placa === placa);
+  await addDoc(collection(db, 'programaciones'), {
+    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs,
+    conductor: v ? v.conductor : '',
+    estado: 'Pendiente',
+    creadoPor: currentUser ? currentUser.nombre : '',
+    ts: Date.now()
+  });
+  toast('Programación guardada ✓');
+  renderProgramacion();
+}
+
+window.completarProg = async function(id) {
+  await setDoc(doc(db, 'programaciones', id), { estado: 'Completado', completadoEn: new Date().toISOString() }, { merge: true });
+  toast('Marcado como completado ✓');
+  renderProgramacion();
+}
+
+window.eliminarProg = async function(id) {
+  if (!confirm('¿Eliminar esta programación?')) return;
+  await deleteDoc(doc(db, 'programaciones', id));
+  toast('Programación eliminada ✓');
+  renderProgramacion();
+}
+
+window.compartirOperaciones = function() {
+  const pendientes = programaciones.filter(p => p.estado !== 'Completado');
+  if (pendientes.length === 0) { toast('No hay programaciones pendientes'); return; }
 
   const hoy = new Date().toLocaleDateString('es-CO');
   let msg = '*TRANSPORTE RAVEL — Programacion de Taller*\n';
