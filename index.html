@@ -1067,32 +1067,23 @@ window.compartirOperaciones = function() {
   if (pendientes.length === 0) { toast('No hay programaciones pendientes'); return; }
 
   const hoy = new Date().toLocaleDateString('es-CO');
-  let msg = '*TRANSPORTE RAVEL — Programacion de Taller*\n';
-  msg += '_Actualizado: ' + hoy + '_\n\n';
-
-  pendientes.forEach(p => {
-    msg += '🚌 *' + p.placa + '*';
-    if (p.conductor) msg += ' — ' + p.conductor;
-    msg += '
-';
-    msg += '📅 Fecha: ' + p.fechaEstimada + '
-';
-    msg += '🔧 Trabajo: ' + p.motivo + '
-';
-    if (p.taller) msg += '🏪 Taller: ' + p.taller + '
-';
-    if (p.prioridad && p.prioridad !== 'Normal') msg += '⚠️ Prioridad: ' + p.prioridad + '
-';
-    if (p.obs) msg += '📝 ' + p.obs + '
-';
-    msg += '
-';
+  const lineas2 = [];
+  pendientes.forEach(function(p) {
+    lineas2.push('Vehiculo: ' + p.placa + (p.conductor ? ' - ' + p.conductor : ''));
+    lineas2.push('Fecha: ' + p.fechaEstimada);
+    lineas2.push('Trabajo: ' + p.motivo);
+    if (p.taller) lineas2.push('Taller: ' + p.taller);
+    if (p.prioridad && p.prioridad !== 'Normal') lineas2.push('Prioridad: ' + p.prioridad);
+    if (p.obs) lineas2.push('Obs: ' + p.obs);
+    lineas2.push('');
   });
-
-  msg += '_Transporte Ravel — Control de Mantenimiento_';
+  const msg = 'TRANSPORTE RAVEL - Programacion de Taller\n' +
+    'Actualizado: ' + hoy + '\n\n' +
+    lineas2.join('\n') +
+    '\nTransporte Ravel - Control de Mantenimiento';
 
   navigator.clipboard.writeText(msg).then(() => {
-    toast('Mensaje copiado — pégalo en WhatsApp ✓');
+    toast('Mensaje copiado - pegalo en WhatsApp');
   }).catch(() => {
     // Fallback
     const ta = document.createElement('textarea');
