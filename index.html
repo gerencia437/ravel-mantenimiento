@@ -999,11 +999,8 @@ window.compartirOperaciones = function() {
   if (pendientes.length === 0) { toast('No hay programaciones pendientes'); return; }
 
   const hoy = new Date().toLocaleDateString('es-CO');
-  let msg = '*TRANSPORTE RAVEL — Programación de Taller*
-';
-  msg += '_Actualizado: ' + hoy + '_
-
-';
+  let msg = '*TRANSPORTE RAVEL — Programacion de Taller*\n';
+  msg += '_Actualizado: ' + hoy + '_\n\n';
 
   pendientes.forEach(p => {
     msg += '🚌 *' + p.placa + '*';
