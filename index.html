@@ -1263,11 +1263,14 @@ window.selHist = function(p) { histPlaca = p; renderView(); }
 
 // ── EXPORTAR EXCEL ──
 window.exportarExcel = function() {
-  // Construir CSV con BOM para Excel
-  const cols = ['Placa','Fecha','Tipo Mant.','Descripcion','Km','Costo','Taller','Conductor','Registrado Por'];
-  const rows = [cols];
+  const bom = '\uFEFF';
+  const lineas = [];
 
-  // Ordenar registros por placa y fecha
+  // ── SECCIÓN 1: HISTORIAL DE MANTENIMIENTOS ──
+  lineas.push(['HISTORIAL DE MANTENIMIENTOS - TRANSPORTE RAVEL']);
+  lineas.push([]);
+  lineas.push(['Placa','Fecha','Tipo Mant.','Descripcion','Km','Costo ($)','Taller','Conductor','Registrado Por']);
+
   const sorted = [...registros].sort((a,b) => {
     if (a.placa < b.placa) return -1;
     if (a.placa > b.placa) return 1;
@@ -1276,36 +1279,41 @@ window.exportarExcel = function() {
 
   sorted.forEach(r => {
     const v = vehiculos.find(x => x.placa === r.placa);
-    rows.push([
+    lineas.push([
       r.placa || '',
       r.fecha || '',
       r.tipo || '',
-      (r.desc || '').replace(/,/g, ';'),
-      r.km || 0,
-      r.costo || 0,
-      (r.taller || '').replace(/,/g, ';'),
-      v ? v.conductor : (r.conductor || ''),
-      (r.registradoPor || '')
+      (r.desc || '').replace(/,/g,';').replace(/
+/g,' '),
+      r.km > 0 ? r.km : '',
+      r.costo > 0 ? r.costo : '',
+      (r.taller || '').replace(/,/g,';'),
+      v ? v.conductor : (r.conductor||''),
+      r.registradoPor || ''
     ]);
   });
 
-  // Agregar hoja de resumen por vehículo al final
-  rows.push([]);
-  rows.push(['--- RESUMEN POR VEHICULO ---']);
-  rows.push(['Placa','Conductor','Tipo','Km Actual','Total Registros','Total Preventivos','Total Correctivos','Costo Total']);
+  // ── SECCIÓN 2: RESUMEN POR VEHÍCULO ──
+  lineas.push([]);
+  lineas.push([]);
+  lineas.push(['RESUMEN POR VEHICULO']);
+  lineas.push([]);
+  lineas.push(['Placa','Conductor','Tipo','Km Actual','Total Registros','Preventivos','Correctivos','Costo Total ($)']);
 
   vehiculos.forEach(v => {
     const regsV = registros.filter(r => r.placa === v.placa);
     const prev = regsV.filter(r => r.tipo !== 'Correctivo').length;
     const corr = regsV.filter(r => r.tipo === 'Correctivo').length;
     const costo = regsV.reduce((s,r) => s+(r.costo||0), 0);
-    rows.push([v.placa, v.conductor, v.tipo, v.km||0, regsV.length, prev, corr, costo]);
+    lineas.push([v.placa, v.conductor, v.tipo, v.km||0, regsV.length, prev, corr, costo]);
   });
 
-  // Agregar estado de alertas
-  rows.push([]);
-  rows.push(['--- ESTADO DE MANTENIMIENTOS ---']);
-  rows.push(['Placa','Conductor','Item','Km Actual','Proximo Km','Faltante Km','Estado']);
+  // ── SECCIÓN 3: ESTADO DE ALERTAS ──
+  lineas.push([]);
+  lineas.push([]);
+  lineas.push(['ESTADO DE MANTENIMIENTOS POR VEHICULO']);
+  lineas.push([]);
+  lineas.push(['Placa','Conductor','Item Mantenimiento','Km Actual','Proximo Km','Faltan Km','Estado']);
 
   vehiculos.forEach(v => {
     if (!v.km) return;
@@ -1314,22 +1322,24 @@ window.exportarExcel = function() {
       const f = getFaltante(v, k);
       const p = getProximo(v, k);
       const est = f === null ? 'Sin dato' : f <= 0 ? 'VENCIDO' : f <= 1500 ? 'PROXIMO' : 'AL DIA';
-      rows.push([v.placa, v.conductor, LABELS[k], v.km, p||'', f||'', est]);
+      lineas.push([v.placa, v.conductor, LABELS[k], v.km, p||'', f !== null ? Math.abs(f) : '', est]);
     });
   });
 
-  // Convertir a CSV con BOM
-  const bom = '﻿';
-  const csv = bom + rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
+  // Convertir a CSV
+  const csv = bom + lineas.map(r =>
+    r.map(c => '"' + String(c === null || c === undefined ? '' : c).replace(/"/g,'""') + '"').join(',')
+  ).join('\n');
 
-  // Descargar
   const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const fecha = new Date().toISOString().split('T')[0];
   a.href = url;
   a.download = 'Historial_Ravel_' + fecha + '.csv';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('Excel descargado ✓');
 }
