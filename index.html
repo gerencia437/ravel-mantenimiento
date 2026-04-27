@@ -932,8 +932,8 @@ async function renderProgramacion() {
               (p.obs ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">' + p.obs + '</div>' : '') +
             '</div>' +
             (canEdit ? '<div style="display:flex;gap:6px;align-items:center">' +
-              '<button onclick="completarProg('' + p.id + '')" style="padding:5px 10px;font-size:11px;background:var(--green-light);color:var(--green-text);border:1px solid var(--green);border-radius:6px;cursor:pointer;font-weight:600">✓ Completado</button>' +
-              '<button onclick="eliminarProg('' + p.id + '')" style="padding:5px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer;font-weight:600">Eliminar</button>' +
+              '<button onclick="completarProg(\'' + p.id + '\')" style="padding:5px 10px;font-size:11px;background:var(--green-light);color:var(--green-text);border:1px solid var(--green);border-radius:6px;cursor:pointer;font-weight:600">✓ Completado</button>' +
+              '<button onclick="eliminarProg(\'' + p.id + '\')" style="padding:5px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer;font-weight:600">Eliminar</button>' +
             '</div>' : '') +
           '</div>';
         }).join('') +
