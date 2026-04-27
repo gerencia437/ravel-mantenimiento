@@ -999,7 +999,7 @@ async function recargarYRenderRegistro() {
 }
 
 function renderRegistro() {
-  const ultimos = registros.slice(0, 8);
+  const ultimos = [...registros].sort((a,b) => (b.fecha||"").localeCompare(a.fecha||"")).slice(0, 10);
   return `
 
   <div class="card">
