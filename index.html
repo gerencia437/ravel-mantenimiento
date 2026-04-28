@@ -367,6 +367,9 @@ async function initData() {
     preoperacionales = pSnap.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
   } catch(e) { preoperacionales = []; }
 
+  // Cargar historial de conductores
+  await cargarHistorialConductores();
+
   histPlaca = vehiculos[0]?.placa || '';
   document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · ${currentUser ? currentUser.nombre : ''} · 2026`;
   renderNav();
@@ -893,6 +896,10 @@ async function renderProgramacion() {
         '</select>' +
         '<input type="date" id="pFecha" min="' + hoy + '" placeholder="Fecha estimada"/>' +
         '<input id="pMotivo" placeholder="Motivo / trabajo a realizar" style="grid-column:1/-1"/>' +
+        '<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+          '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora inicio</label><input type="time" id="pHoraInicio" style="width:100%"/></div>' +
+          '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora fin estimada</label><input type="time" id="pHoraFin" style="width:100%"/></div>' +
+        '</div>' +
         '<select id="pTaller"><option value="">Seleccionar taller</option>' +
           talleres.map(t => '<option>' + t + '</option>').join('') +
         '</select>' +
@@ -925,9 +932,11 @@ async function renderProgramacion() {
               '</div>' +
               '<div style="font-size:13px;color:var(--text);margin-bottom:2px">' + (p.motivo||'') + '</div>' +
               '<div style="font-size:12px;color:var(--text-muted)">' +
-                '📅 ' + p.fechaEstimada + (diasFaltan >= 0 ? ' · En ' + diasFaltan + ' día(s)' : ' · VENCIDO') +
-                (p.taller ? ' · 🔧 ' + p.taller : '') +
-                (v ? ' · 👤 ' + v.conductor : '') +
+                '📅 ' + p.fechaEstimada +
+                (p.horaInicio ? ' · ' + p.horaInicio + (p.horaFin ? ' - ' + p.horaFin : '') : '') +
+                (diasFaltan >= 0 ? ' · En ' + diasFaltan + ' dia(s)' : ' · VENCIDO') +
+                (p.taller ? ' · ' + p.taller : '') +
+                (v ? ' · ' + v.conductor : '') +
               '</div>' +
               (p.obs ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">' + p.obs + '</div>' : '') +
             '</div>' +
@@ -966,12 +975,14 @@ window.guardarProgramacion = async function() {
   const taller = document.getElementById('pTaller').value;
   const prioridad = document.getElementById('pPrioridad').value;
   const obs = document.getElementById('pObs').value;
+  const horaInicio = document.getElementById('pHoraInicio') ? document.getElementById('pHoraInicio').value : '';
+  const horaFin = document.getElementById('pHoraFin') ? document.getElementById('pHoraFin').value : '';
 
   if (!placa || !fecha || !motivo) { toast('Completa placa, fecha y motivo'); return; }
 
   const v = vehiculos.find(x => x.placa === placa);
   await addDoc(collection(db, 'programaciones'), {
-    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs,
+    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs, horaInicio, horaFin,
     conductor: v ? v.conductor : '',
     estado: 'Pendiente',
     creadoPor: currentUser ? currentUser.nombre : '',
@@ -1034,12 +1045,14 @@ window.guardarProgramacion = async function() {
   const taller = document.getElementById('pTaller').value;
   const prioridad = document.getElementById('pPrioridad').value;
   const obs = document.getElementById('pObs').value;
+  const horaInicio = document.getElementById('pHoraInicio') ? document.getElementById('pHoraInicio').value : '';
+  const horaFin = document.getElementById('pHoraFin') ? document.getElementById('pHoraFin').value : '';
 
   if (!placa || !fecha || !motivo) { toast('Completa placa, fecha y motivo'); return; }
 
   const v = vehiculos.find(x => x.placa === placa);
   await addDoc(collection(db, 'programaciones'), {
-    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs,
+    placa, fechaEstimada: fecha, motivo, taller, prioridad, obs, horaInicio, horaFin,
     conductor: v ? v.conductor : '',
     estado: 'Pendiente',
     creadoPor: currentUser ? currentUser.nombre : '',
@@ -1737,8 +1750,34 @@ function renderInforme() {
 
 window.selMes = function(i) { mesInf = i; renderView(); }
 
+
+// ── HISTORIAL DE CONDUCTORES ──
+const CONDUCTORES_SEED = [{"placa": "WMO864", "cedula": "98592090", "nombre": "GILER ALEXANDER BARRANTES GARCIA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "TTX964", "cedula": "71678173", "nombre": "WALTER DARIEN RAMIREZ RODRIGUEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "JYM994", "cedula": "71781821", "nombre": "NILTON LIBEYMAR GAVIRIA TORO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "GDX595", "cedula": "98702901", "nombre": "ERIC ALEXANDER LEGUIZAMON ESTRADA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "JYN602", "cedula": "1128470715", "nombre": "SEBASTIAN SANCHEZ SANCHEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EQX672", "cedula": "71731171", "nombre": "SERGIO IVAN RESTREPO ZAPATA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EQX102", "cedula": "1017128973", "nombre": "ALEJANDRO ESCOBAR AGUDELO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EQX014", "cedula": "1037658725", "nombre": "NIXON RAMIREZ GARCIA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "NNM812", "cedula": "1027881225", "nombre": "CARLOS AUGUSTO MUNOZ SALDARRIAGA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EQX104", "cedula": "1046666147", "nombre": "SIMON ZAPATA ARANGO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "SNZ317", "cedula": "1039759304", "nombre": "DANIEL FELIPE RESTREPO RODAS", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "TLY677", "cedula": "1000755291", "nombre": "CRISTIAN CAMILO ORTIZ GALEANO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "NNM607", "cedula": "1035873741", "nombre": "YEISON ALEXANDER DIAZ PABON", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "STY707", "cedula": "98667475", "nombre": "JUAN FELIPE HENAO GOMEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EQX103", "cedula": "1025880247", "nombre": "DANIEL ARTURO CASTELLANO SAN", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "EXU474", "cedula": "1081786668", "nombre": "CARLOS JULIO MADRID MONTES", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "WCP663", "cedula": "71365732", "nombre": "ANDRES FELIPE VALLEJO MARTINEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "LKL364", "cedula": "71392656", "nombre": "JOSE WILSON SALDARRIAGA QUICENO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "SNO578", "cedula": "1025644895", "nombre": "JUAN DIEGO MUNOZ SANCHEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "WGO340", "cedula": "1004027853", "nombre": "YEFERSON MUNOZ VELASQUEZ", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "STW467", "cedula": "1152194712", "nombre": "HENRY RENE GOMEZ HIGUITA", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "SXY558", "cedula": "1022403200", "nombre": "WILMER ARIEL VELEZ QUINTERO", "fechaInicio": "2026-04-28", "activo": true}, {"placa": "SNQ413", "cedula": "1064897113", "nombre": "LUIS FERNANDO DELGADO GARCIA", "fechaInicio": "2026-04-28", "activo": true}];
+
+let historialConductores = [];
+
+async function cargarHistorialConductores() {
+  const snap = await getDocs(collection(db, 'historialConductores'));
+  if (snap.empty) {
+    for (const c of CONDUCTORES_SEED) {
+      await addDoc(collection(db, 'historialConductores'), {...c, ts: Date.now()});
+    }
+  }
+  const snap2 = await getDocs(collection(db, 'historialConductores'));
+  historialConductores = snap2.docs.map(d => ({id: d.id, ...d.data()}));
+}
+
 // ── CONDUCTORES ──
 function renderConductores() {
+  const canEdit = currentUser && (currentUser.rol === 'superadmin' || currentUser.rol === 'tecnico');
+
+  // Agrupar historial por placa
+  const histPorPlaca = {};
+  historialConductores.forEach(h => {
+    if (!histPorPlaca[h.placa]) histPorPlaca[h.placa] = [];
+    histPorPlaca[h.placa].push(h);
+  });
+
   return `
   <div class="card">
     <div class="card-header">Generar alerta WhatsApp</div>
@@ -1747,18 +1786,81 @@ function renderConductores() {
       <div id="waResult" style="margin-top:10px"></div>
     </div>
   </div>
+  ${canEdit ? `
   <div class="card">
-    <div class="card-header">Conductores — ${vehiculos.length} vehículos</div>
-    ${vehiculos.map(v=>`
-      <div class="row" style="justify-content:space-between">
-        <div>
-          <span style="font-weight:500;font-size:13px">${v.conductor}</span>
-          <span style="font-size:12px;color:#888;margin-left:8px">${v.cel}</span>
-          <div style="font-size:12px;color:#888;margin-top:2px">${v.marca} ${v.modelo}</div>
+    <div class="card-header">Registrar cambio de conductor</div>
+    <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <select id="cPlaca">
+        <option value="">Seleccionar vehículo</option>
+        ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.conductor}</option>`).join('')}
+      </select>
+      <input type="date" id="cFecha" value="${new Date().toISOString().split('T')[0]}"/>
+      <input id="cCedula" placeholder="Cédula del nuevo conductor"/>
+      <input id="cNombre" placeholder="Nombre completo del nuevo conductor"/>
+      <button class="btn" style="grid-column:1/-1" onclick="registrarCambioConductor()">Registrar cambio</button>
+    </div>
+  </div>` : ''}
+  <div class="card">
+    <div class="card-header">Conductores activos — ${vehiculos.length} vehículos</div>
+    ${vehiculos.map(v => {
+      const hist = (histPorPlaca[v.placa] || []).sort((a,b) => (b.fechaInicio||'').localeCompare(a.fechaInicio||''));
+      const actual = hist.find(h => h.activo) || hist[0];
+      return `<div class="row" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:600;font-size:13px">${v.placa}</span>
+            <span style="font-size:13px;margin-left:8px">${actual ? actual.nombre : v.conductor}</span>
+            ${actual ? `<div style="font-size:11px;color:var(--text-muted)">CC: ${actual.cedula} · Desde: ${actual.fechaInicio}</div>` : ''}
+          </div>
+          <button onclick="verHistConductor('${v.placa}')" style="padding:3px 10px;font-size:11px;background:var(--blue-light);color:var(--blue);border:1px solid #c0d8f0;border-radius:5px;cursor:pointer;font-weight:600">Ver historial</button>
         </div>
-        <div style="font-size:12px;background:#f5f5f0;color:#888;padding:2px 10px;border-radius:5px;flex-shrink:0">${v.placa}</div>
-      </div>`).join('')}
+        <div id="histCond_${v.placa}" style="display:none;margin-top:8px;background:var(--bg);border-radius:8px;padding:8px">
+          ${hist.length > 0 ? hist.map(h =>
+            `<div style="font-size:12px;padding:4px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between">
+              <span>${h.nombre} <span style="color:var(--text-muted)">CC: ${h.cedula}</span></span>
+              <span style="color:var(--text-muted)">${h.fechaInicio}${h.fechaFin ? ' → '+h.fechaFin : ' → Actual'}</span>
+            </div>`
+          ).join('') : '<div style="font-size:12px;color:var(--text-muted)">Sin historial registrado</div>'}
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;
+}
+
+window.verHistConductor = function(placa) {
+  const el = document.getElementById('histCond_' + placa);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+window.registrarCambioConductor = async function() {
+  const placa = document.getElementById('cPlaca').value;
+  const fecha = document.getElementById('cFecha').value;
+  const cedula = document.getElementById('cCedula').value.trim();
+  const nombre = document.getElementById('cNombre').value.trim().toUpperCase();
+
+  if (!placa || !fecha || !cedula || !nombre) { toast('Completa todos los campos'); return; }
+
+  // Cerrar conductor anterior
+  const snap = await getDocs(collection(db, 'historialConductores'));
+  const anteriores = snap.docs.filter(d => d.data().placa === placa && d.data().activo);
+  for (const doc2 of anteriores) {
+    await setDoc(doc(db, 'historialConductores', doc2.id), { activo: false, fechaFin: fecha }, { merge: true });
+  }
+
+  // Agregar nuevo conductor
+  await addDoc(collection(db, 'historialConductores'), {
+    placa, cedula, nombre, fechaInicio: fecha, fechaFin: null, activo: true, ts: Date.now()
+  });
+
+  // Actualizar nombre en vehiculos
+  await saveVehiculo(placa, { conductor: nombre });
+
+  // Recargar historial
+  const snap2 = await getDocs(collection(db, 'historialConductores'));
+  historialConductores = snap2.docs.map(d => ({id: d.id, ...d.data()}));
+
+  toast('Cambio de conductor registrado');
+  renderView();
 }
 
 window.genWhatsapp = function() {
