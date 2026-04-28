@@ -1790,14 +1790,37 @@ function renderConductores() {
   <div class="card">
     <div class="card-header">Registrar cambio de conductor</div>
     <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <select id="cPlaca">
+      <select id="cPlaca" style="grid-column:1/-1" onchange="onPlacaCambio()">
         <option value="">Seleccionar vehículo</option>
         ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.conductor}</option>`).join('')}
       </select>
       <input type="date" id="cFecha" value="${new Date().toISOString().split('T')[0]}"/>
-      <input id="cCedula" placeholder="Cédula del nuevo conductor"/>
-      <input id="cNombre" placeholder="Nombre completo del nuevo conductor"/>
-      <button class="btn" style="grid-column:1/-1" onclick="registrarCambioConductor()">Registrar cambio</button>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:5px">Seleccionar conductor existente</label>
+        <select id="cConductorSel" onchange="onConductorSel(this.value)" style="width:100%">
+          <option value="">— Seleccionar del listado —</option>
+          ${(() => {
+            const activos = new Set(historialConductores.filter(h=>h.activo).map(h=>h.cedula));
+            const todos = historialConductores.reduce((acc, h) => {
+              if (!acc.find(x=>x.cedula===h.cedula)) acc.push(h);
+              return acc;
+            }, []).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+            return todos.map(h => {
+              const ocupado = activos.has(h.cedula);
+              const placaActual = ocupado ? historialConductores.find(x=>x.activo&&x.cedula===h.cedula)?.placa : '';
+              return `<option value="${h.cedula}|${h.nombre}">
+                ${ocupado?'['+placaActual+'] ':''}${h.nombre} — CC: ${h.cedula}
+              </option>`;
+            }).join('');
+          })()}
+          <option value="__nuevo__">+ Ingresar conductor nuevo</option>
+        </select>
+      </div>
+      <div id="cNuevoWrap" style="grid-column:1/-1;display:none;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <input id="cCedula" placeholder="Cédula del nuevo conductor"/>
+        <input id="cNombre" placeholder="Nombre completo"/>
+      </div>
+      <button class="btn" style="grid-column:1/-1;margin-top:4px" onclick="registrarCambioConductor()">Registrar cambio</button>
     </div>
   </div>` : ''}
   <div class="card">
@@ -1827,6 +1850,32 @@ function renderConductores() {
   </div>`;
 }
 
+window.onPlacaCambio = function() {
+  // Resetear selector de conductor
+  const sel = document.getElementById('cConductorSel');
+  if (sel) sel.value = '';
+  const wrap = document.getElementById('cNuevoWrap');
+  if (wrap) wrap.style.display = 'none';
+}
+
+window.onConductorSel = function(val) {
+  const wrap = document.getElementById('cNuevoWrap');
+  const cedEl = document.getElementById('cCedula');
+  const nomEl = document.getElementById('cNombre');
+  if (val === '__nuevo__') {
+    wrap.style.display = 'grid';
+    if (cedEl) cedEl.value = '';
+    if (nomEl) nomEl.value = '';
+  } else if (val) {
+    wrap.style.display = 'none';
+    const parts = val.split('|');
+    if (cedEl) cedEl.value = parts[0] || '';
+    if (nomEl) nomEl.value = parts[1] || '';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
 window.verHistConductor = function(placa) {
   const el = document.getElementById('histCond_' + placa);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
@@ -1835,10 +1884,29 @@ window.verHistConductor = function(placa) {
 window.registrarCambioConductor = async function() {
   const placa = document.getElementById('cPlaca').value;
   const fecha = document.getElementById('cFecha').value;
-  const cedula = document.getElementById('cCedula').value.trim();
-  const nombre = document.getElementById('cNombre').value.trim().toUpperCase();
+  const selCond = document.getElementById('cConductorSel');
+  let cedula = '', nombre = '';
+  if (selCond && selCond.value && selCond.value !== '__nuevo__') {
+    const parts = selCond.value.split('|');
+    cedula = parts[0] || '';
+    nombre = (parts[1] || '').toUpperCase();
+  } else {
+    const cedEl = document.getElementById('cCedula');
+    const nomEl = document.getElementById('cNombre');
+    cedula = cedEl ? cedEl.value.trim() : '';
+    nombre = nomEl ? nomEl.value.trim().toUpperCase() : '';
+  }
 
   if (!placa || !fecha || !cedula || !nombre) { toast('Completa todos los campos'); return; }
+
+  // Verificar si el conductor está activo en otro vehículo
+  const yaActivo = historialConductores.find(h => h.activo && h.cedula === cedula && h.placa !== placa);
+  if (yaActivo) {
+    const confirmar = confirm(nombre + ' está activo en ' + yaActivo.placa + ' desde ' + yaActivo.fechaInicio + '.\n\n¿Deseas trasladarlo a ' + placa + '?\n\nEl historial de ambos vehículos quedará registrado.');
+    if (!confirmar) return;
+    // Cerrar en el vehículo anterior
+    await setDoc(doc(db, 'historialConductores', yaActivo.id), { activo: false, fechaFin: fecha }, { merge: true });
+  }
 
   // Cerrar conductor anterior
   const snap = await getDocs(collection(db, 'historialConductores'));
