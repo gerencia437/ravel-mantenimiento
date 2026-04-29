@@ -421,7 +421,7 @@ function renderView() {
   else if (VIEW === 'Preoperacional') c.innerHTML = renderPreoperacional();
   else if (VIEW === 'Usuarios') c.innerHTML = renderUsuarios();
   else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
-  else if (VIEW === 'Km base') c.innerHTML = renderKmBase();
+  else if (VIEW === 'Km base') { recargarKmBase(); return; }
   else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
   else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
   else if (VIEW === 'Programación') { renderProgramacion(); return; }
@@ -1215,6 +1215,17 @@ window.aplicarImport = async function() {
 }
 
 // ── KM BASE ──
+async function recargarKmBase() {
+  const c = document.getElementById('content');
+  // Recargar kmBase desde Firebase
+  try {
+    const kSnap = await getDocs(collection(db, 'kmBase'));
+    kSnap.forEach(d => { kmBase[d.id] = d.data(); });
+  } catch(e) {}
+  c.innerHTML = renderKmBase();
+  bindEvents();
+}
+
 function renderKmBase() {
   const btns = vehiculos.map(v => `<button class="nav" style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${histPlaca===v.placa?'#0F6E56':'#f5f5f0'};color:${histPlaca===v.placa?'#fff':'#666'}" onclick="selKmBase('${v.placa}')">${v.placa}</button>`).join('');
   const v = vehiculos.find(x => x.placa === histPlaca);
@@ -1555,18 +1566,22 @@ window.guardarRegistro = async function() {
   await addRegistro(reg);
 
   // Actualizar km del vehículo si subió
-  if (km > 0) {
-    const v = vehiculos.find(x => x.placa === placa);
-    if (v && km > (v.km||0)) await saveVehiculo(placa, { km });
-  }
-  // Actualizar kmBase siempre que haya un ítem seleccionado
+  const v = vehiculos.find(x => x.placa === placa);
+  if (km > 0 && v && km > (v.km||0)) await saveVehiculo(placa, { km });
+
+  // Actualizar kmBase SIEMPRE que haya ítem seleccionado
   if (item && item !== '__otro__') {
     if (item === 'llantas') {
-      await saveKmBase(placa, { llantas_fecha: fecha, llantas_km: km > 0 ? km : (kmBase[placa]?.llantas_km || 0) });
+      // Llantas usa fecha y km
+      const kmLlantas = km > 0 ? km : (kmBase[placa]?.llantas_km || 0);
+      await saveKmBase(placa, { llantas_fecha: fecha, llantas_km: kmLlantas });
     } else if (item === 'bateria') {
+      // Batería usa fecha
       await saveKmBase(placa, { bateria_fecha: fecha });
-    } else if (km > 0) {
-      await saveKmBase(placa, { [item]: km });
+    } else {
+      // Todos los demás ítems: usar km del registro, si no hay usar km actual del vehículo
+      const kmGuardar = km > 0 ? km : (v ? v.km : 0);
+      if (kmGuardar > 0) await saveKmBase(placa, { [item]: kmGuardar });
     }
   }
 
