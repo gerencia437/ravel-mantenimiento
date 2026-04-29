@@ -1554,21 +1554,19 @@ window.guardarRegistro = async function() {
     ts: Date.now() };
   await addRegistro(reg);
 
+  // Actualizar km del vehículo si subió
   if (km > 0) {
     const v = vehiculos.find(x => x.placa === placa);
     if (v && km > (v.km||0)) await saveVehiculo(placa, { km });
-    if (item && item !== '__otro__') {
-      if (item === 'llantas') {
-        // Llantas: guardar fecha de hoy y km
-        const hoy = new Date().toISOString().split('T')[0];
-        await saveKmBase(placa, { llantas_fecha: fecha, llantas_km: km });
-      } else if (item === 'bateria') {
-        // Batería: guardar fecha del registro
-        await saveKmBase(placa, { bateria_fecha: fecha });
-      } else {
-        // Resto de ítems: guardar km
-        await saveKmBase(placa, { [item]: km });
-      }
+  }
+  // Actualizar kmBase siempre que haya un ítem seleccionado
+  if (item && item !== '__otro__') {
+    if (item === 'llantas') {
+      await saveKmBase(placa, { llantas_fecha: fecha, llantas_km: km > 0 ? km : (kmBase[placa]?.llantas_km || 0) });
+    } else if (item === 'bateria') {
+      await saveKmBase(placa, { bateria_fecha: fecha });
+    } else if (km > 0) {
+      await saveKmBase(placa, { [item]: km });
     }
   }
 
