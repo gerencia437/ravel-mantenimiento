@@ -149,13 +149,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const INT_BUS = {motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
-const INT_NPR_EXU = {motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
-const INT_NPR_NNM = {motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
-const INT_URVAN = {motor:7000,caja:40000,transmision:40000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_NV350 = {motor:7000,caja:30000,transmision:30000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_MASTER = {motor:10000,caja:60000,transmision:60000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_DUSTER = {motor:10000,caja:80000,transmision:80000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_BUS = {bateria:null,motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
+const INT_NPR_EXU = {bateria:null,motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_NPR_NNM = {bateria:null,motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_URVAN = {bateria:null,motor:7000,caja:40000,transmision:40000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_NV350 = {bateria:null,motor:7000,caja:30000,transmision:30000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_MASTER = {bateria:null,motor:10000,caja:60000,transmision:60000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_DUSTER = {bateria:null,motor:10000,caja:80000,transmision:80000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
 
 const VEHICULOS_SEED = [
   {placa:"EQX014",conductor:"Nixon",cel:"300 7216367",tipo:"Bus",marca:"Chevrolet FRR",modelo:2018,km:377982,int:INT_BUS},
@@ -188,7 +188,7 @@ const VEHICULOS_SEED = [
   {placa:"NNM812",conductor:"Carlos Gómez",cel:"321 7532281",tipo:"Camioneta DC",marca:"Renault Duster Oroch",modelo:2025,km:62859,int:INT_DUSTER},
 ];
 
-const LABELS = {motor:"Aceite motor + correas y líneas turbo",caja:"Aceite caja",transmision:"Transmisión",frenos:"Frenos",llantas:"Llantas",bateria:"Cambio de batería",engrase:"Engrase / muelles",alternador:"Alternador",correa:"Correa AA / Alternador",alineacion:"Alineación / Rotación",liqFrenos:"Líquido de frenos",liqEmbrague:"Líquido de embrague",aceiteDireccion:"Aceite de dirección",refrigerante:"Refrigerante motor",calibValvulas:"Calibración de válvulas"};
+const LABELS = {motor:"Aceite motor + correas y líneas turbo",frenos:"Frenos",alineacion:"Alineación / Rotación",engrase:"Engrase / muelles",caja:"Aceite caja",transmision:"Transmisión",correa:"Correa AA / Alternador",bateria:"Batería",llantas:"Llantas",alternador:"Alternador",liqFrenos:"Líquido de frenos",liqEmbrague:"Líquido de embrague",aceiteDireccion:"Aceite de dirección",refrigerante:"Refrigerante motor",calibValvulas:"Calibración de válvulas"};
 const ITEMS_BASE = Object.entries(LABELS).map(([k,l])=>({key:k,label:l}));
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const TALLERES_SEED = ["A.R VIDRIOS AUTOMOTRIZ","ALEXANDER MEJIA (EL NIÑO)","ANIBAL RADIADORES","AUTOS EL REY","AUTOLARTE","BENDY REPUESTOS","CARHAUS AUTOMOTRIZ SAS","CARIBE MOTOR","CARROCERO","CASTRO TORO JHON DAYRO","CHALO AVISOS SAS","CHAMPION SAS","CM AUTOPARTES","DANER ARNETH LOPEZ","DARWIN GIOVANY AGUDELO","DANIEL BOMBA URVAN","DIEGO TRUJILLO","DIESEL AMBIENTAL","DIESEL ANDINO","DISTRIBUIDORA NISSAN","DIRECCIONES BUFALO","DZ ELECTRICO","EURIPIDES","EJES Y RADIADORES DEL NORTE","EL TRAPICHE","ELECTRILAGOS","FENIX","FIBRAS ESCUDERO SAS","FRENOS AYURA","FRENOS Y AIRES MEDELLIN","FRENOS FALCIONI","GALVIS BORRERO JULIO","GIOVANY DELGADO","GENERACION DIESEL","GLOBAL PARTES","GRUAXEPRESS","GUAYAS EL ABUELO","HELICOIL","HERNANDO JOSE BENITEZ","INVERSIONES LOTERO PELAEZ","JHONY ALEXANDER GARCIA","JULIO CESAR GALVIS","JUAN CARLOS MORENO","LABORATORIO JJ DIESEL","LABORATORIO REPARDIESEL","LALO COMPRESORES","LA CASA DEL EMBRAGUE","LODARYS TORRES","LOS PRIMOS","LUJOS EL TRAPICHE","MUELLES CART","MUNDO LUJOS","NATALUJOS IRMA NATALIA","NANO FRENOS","NIPON PARTES","NISSAN Y CAMPEROS","ODMEL S.A.S","OLMED VIGIAS","ORIENTAL DE VIDRIOS","PABLO GOMEZ FRENOS","PACHO DIESEL","PETETE","PROPARTES","RAMO ELECTRICOS","RICARDO PALOMARES","REAL VIDRIOS","RECTIFICADORA JOAR","REPUESTOS Y SERVICIOS D&J SAS","RYH REPUESTOS","SERVIREENCAUCHE DE COLOMBIA SA","SERVITECA LISTO","SEA ITAGUI","SOLO TURBOS","SOLO FRENOS (PETETE)","TALLER INDUSTRIAL LA MACARENA","TALLER LOS PRIMOS","TALLER LUCHO","TALLER RAVEL","TALLER SANCAR","TALLER PROPIO","TAVO FRENOS","TAXIMTEROS EL CHUPA","TECNICENTRO LOS COLORES","VIVIANA MARITZA-NANO","WILLIAN ELECTRICO GUARNE","WILSON RUIZ","WILDER MAURICIO MENDOZA","YOMANALBEIRO","YUBERNEY TAMAYO","YULI CINTURONES","ZULED","ZULUAGA BERRIO SARAH","PUNTO LUJOS"];
@@ -607,6 +607,27 @@ function renderAlertas() {
       if ((alertFiltro === 'todos' || alertFiltro === est) && (alertPlaca === 'todas' || alertPlaca === v.placa))
         alertas.push({ placa: v.placa, conductor: v.conductor, item: LABELS[k], faltante: f, proximo: getProximo(v, k), estado: est });
     });
+  });
+  // Agregar alertas de batería por fecha
+  vehiculos.forEach(v => {
+    const fecha = kmBase[v.placa]?.bateria_fecha;
+    if (!fecha) return;
+    const d = new Date(fecha);
+    d.setFullYear(d.getFullYear() + 1);
+    const dias = Math.ceil((d - new Date()) / 86400000);
+    const faltaKm = dias; // usamos días como proxy
+    const est = dias <= 0 ? 'rojo' : dias <= 30 ? 'amarillo' : 'verde';
+    if (alertFiltro === 'todos' || alertFiltro === est)
+      if (alertPlaca === 'todas' || alertPlaca === v.placa)
+        alertas.push({
+          placa: v.placa, conductor: v.conductor,
+          item: 'Batería — próx: ' + d.toISOString().split('T')[0],
+          faltante: dias <= 0 ? dias : null,
+          proximo: null,
+          estado: est,
+          esFecha: true,
+          label: dias <= 0 ? 'Vencida' : 'Faltan ' + dias + ' días'
+        });
   });
   alertas.sort((a, b) => (a.faltante ?? 99999) - (b.faltante ?? 99999));
 
@@ -1201,6 +1222,34 @@ function renderKmBase() {
   const base = kmBase[v.placa] || {};
 
   const rows = Object.keys(LABELS).map(k => {
+    // Batería: manejo por fecha
+    if (k === 'bateria') {
+      const fechaBat = base['bateria_fecha'] || '';
+      let proxBat = '', estadoBat = 'gris', diasBat = null;
+      if (fechaBat) {
+        const d = new Date(fechaBat);
+        d.setFullYear(d.getFullYear() + 1);
+        proxBat = d.toISOString().split('T')[0];
+        diasBat = Math.ceil((d - new Date()) / 86400000);
+        estadoBat = diasBat <= 0 ? 'rojo' : diasBat <= 30 ? 'amarillo' : 'verde';
+      }
+      return `<div class="row" style="align-items:center">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">Batería</div>
+          <div style="font-size:11px;color:#888">Cambio cada 12 meses · Alerta 1 mes antes</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <div>
+              <div style="font-size:10px;color:#888;margin-bottom:2px">Fecha último cambio</div>
+              <input type="date" value="${fechaBat}" id="kmb_${v.placa}_bateria" style="width:150px;font-size:12px"/>
+            </div>
+            <button onclick="saveBateria('${v.placa}',document.getElementById('kmb_${v.placa}_bateria').value)" style="padding:5px 10px;font-size:11px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
+          </div>
+          ${fechaBat ? `<div class="badge ${estadoBat}">${diasBat<=0?'Vencida':'Próximo: '+proxBat+' ('+diasBat+' días)'}</div>` : '<div class="badge gris">Sin fecha registrada</div>'}
+        </div>
+      </div>`;
+    }
     if (!v.int[k]) return '';
     const bv = base[k] !== undefined ? base[k] : '';
     const prox = bv !== '' ? parseInt(bv) + v.int[k] : (v.km ? Math.floor(v.km/v.int[k])*v.int[k]+v.int[k] : null);
@@ -1249,6 +1298,13 @@ window.guardarTodoKmBase = async function(placa) {
 }
 
 window.selKmBase = function(p) { histPlaca = p; renderView(); }
+
+window.saveBateria = async function(placa, fecha) {
+  if (!fecha) { toast('Ingresa la fecha del último cambio'); return; }
+  await saveKmBase(placa, { bateria_fecha: fecha });
+  toast('Batería guardada');
+  renderView();
+}
 
 window.updateKmBaseField = async function(placa, k, val) {
   await saveKmBase(placa, { [k]: val ? parseInt(val) : '' });
