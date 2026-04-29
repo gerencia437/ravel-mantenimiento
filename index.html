@@ -1556,7 +1556,19 @@ window.guardarRegistro = async function() {
   if (km > 0) {
     const v = vehiculos.find(x => x.placa === placa);
     if (v && km > (v.km||0)) await saveVehiculo(placa, { km });
-    if (item && item !== '__otro__') await saveKmBase(placa, { [item]: km });
+    if (item && item !== '__otro__') {
+      if (item === 'llantas') {
+        // Llantas: guardar fecha de hoy y km
+        const hoy = new Date().toISOString().split('T')[0];
+        await saveKmBase(placa, { llantas_fecha: fecha, llantas_km: km });
+      } else if (item === 'bateria') {
+        // Batería: guardar fecha del registro
+        await saveKmBase(placa, { bateria_fecha: fecha });
+      } else {
+        // Resto de ítems: guardar km
+        await saveKmBase(placa, { [item]: km });
+      }
+    }
   }
 
   facturaBase64 = null; facturaMediaType = null;
