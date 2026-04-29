@@ -1228,7 +1228,24 @@ function renderKmBase() {
   <div class="card">
     <div class="card-header"><span>${v.placa} — ${v.marca} ${v.modelo}</span><span style="font-size:12px;color:#888">Km actual: ${v.km?fmt(v.km)+' km':'sin km'}</span></div>
     ${rows}
-  </div>`;
+  </div>
+  <button onclick="guardarTodoKmBase('${v.placa}')" style="width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px">Guardar todo</button>
+  `;
+}
+
+window.guardarTodoKmBase = async function(placa) {
+  const inputs = document.querySelectorAll('.kmbase-input');
+  let guardados = 0;
+  for (const inp of inputs) {
+    const k = inp.getAttribute('data-key');
+    const val = inp.value;
+    if (k && val) {
+      await saveKmBase(placa, { [k]: parseInt(val) });
+      guardados++;
+    }
+  }
+  toast(guardados + ' campos guardados');
+  renderView();
 }
 
 window.selKmBase = function(p) { histPlaca = p; renderView(); }
