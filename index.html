@@ -149,13 +149,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const INT_BUS = {bateria:null,motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
-const INT_NPR_EXU = {bateria:null,motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
-const INT_NPR_NNM = {bateria:null,motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:15000,correa:15000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
-const INT_URVAN = {bateria:null,motor:7000,caja:40000,transmision:40000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_NV350 = {bateria:null,motor:7000,caja:30000,transmision:30000,frenos:8000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_MASTER = {bateria:null,motor:10000,caja:60000,transmision:60000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
-const INT_DUSTER = {bateria:null,motor:10000,caja:80000,transmision:80000,frenos:10000,engrase:null,alternador:15000,correa:15000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_BUS = {bateria:null,motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:6000,correa:6000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
+const INT_NPR_EXU = {bateria:null,motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:10000,correa:10000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_NPR_NNM = {bateria:null,motor:20000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:20000,correa:20000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
+const INT_URVAN = {bateria:null,motor:7000,caja:40000,transmision:40000,frenos:8000,engrase:null,alternador:7000,correa:7000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_NV350 = {bateria:null,motor:7000,caja:30000,transmision:30000,frenos:8000,engrase:null,alternador:7000,correa:7000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_MASTER = {bateria:null,motor:10000,caja:60000,transmision:60000,frenos:10000,engrase:null,alternador:10000,correa:10000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
+const INT_DUSTER = {bateria:null,motor:10000,caja:80000,transmision:80000,frenos:10000,engrase:null,alternador:10000,correa:10000,alineacion:10000,liqFrenos:null,liqEmbrague:null,aceiteDireccion:null,refrigerante:null,calibValvulas:null};
 
 const VEHICULOS_SEED = [
   {placa:"EQX014",conductor:"Nixon",cel:"300 7216367",tipo:"Bus",marca:"Chevrolet FRR",modelo:2018,km:377982,int:INT_BUS},
