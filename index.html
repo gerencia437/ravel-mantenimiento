@@ -1329,20 +1329,21 @@ window.saveLlantas = async function(placa, fecha, km) {
   if (fecha) data['llantas_fecha'] = fecha;
   if (km) data['llantas_km'] = parseInt(km);
   await saveKmBase(placa, data);
-  toast('Llantas guardado');
+  toast('Llantas guardado ✓');
   renderView();
 }
 
 window.saveBateria = async function(placa, fecha) {
   if (!fecha) { toast('Ingresa la fecha del último cambio'); return; }
   await saveKmBase(placa, { bateria_fecha: fecha });
-  toast('Batería guardada');
+  toast('Batería guardada ✓');
   renderView();
 }
 
 window.updateKmBaseField = async function(placa, k, val) {
   await saveKmBase(placa, { [k]: val ? parseInt(val) : '' });
-  toast('Guardado');
+  toast('Guardado ✓');
+  renderView();
 }
 
 // ── REGISTRO ──
