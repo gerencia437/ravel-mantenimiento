@@ -209,8 +209,8 @@ let preoperacionales = [];
 // ── USUARIO ACTUAL ──
 let currentUser = null; // { cedula, nombre }
 
-const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Programación","Informe mensual","Conductores","Usuarios"];
-const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Importar km","Km base","Registro","Historial","Programación","Informe mensual","Conductores"];
+const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Informe mensual","Conductores","Usuarios"];
+const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Informe mensual","Conductores"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
 const $ = id => document.getElementById(id);
@@ -420,7 +420,7 @@ function renderView() {
   else if (VIEW === 'Alertas') c.innerHTML = renderAlertas();
   else if (VIEW === 'Preoperacional') c.innerHTML = renderPreoperacional();
   else if (VIEW === 'Usuarios') c.innerHTML = renderUsuarios();
-  else if (VIEW === 'Importar km') c.innerHTML = renderImportar();
+
   else if (VIEW === 'Km base') { recargarKmBase(); return; }
   else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
   else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
@@ -1229,7 +1229,8 @@ async function recargarKmBase() {
 function renderKmBase() {
   const btns = vehiculos.map(v => `<button class="nav" style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${histPlaca===v.placa?'#0F6E56':'#f5f5f0'};color:${histPlaca===v.placa?'#fff':'#666'}" onclick="selKmBase('${v.placa}')">${v.placa}</button>`).join('');
   const v = vehiculos.find(x => x.placa === histPlaca);
-  if (!v) return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>`;
+  const importCard = '<div class="card" style="margin-bottom:16px"><div class="card-header">Importar km desde archivo</div><div style="padding:14px"><label style="display:block;border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg)"><div style="font-size:22px;margin-bottom:4px">&#128202;</div><div style="font-size:13px;font-weight:600;margin-bottom:2px">Subir reporte de preoperacionales</div><div style="font-size:12px;color:var(--text-muted)">Archivos .txt o .csv</div><input type="file" accept=".txt,.csv" style="display:none" onchange="procesarImport(event)"/></label><div id="importResult" style="margin-top:10px"></div></div></div>';
+  if (!v) return importCard + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>`;
   const base = kmBase[v.placa] || {};
 
   const rows = Object.keys(LABELS).map(k => {
@@ -1305,7 +1306,7 @@ function renderKmBase() {
     </div>`;
   }).join('');
 
-  return `
+  return importCard + `
   <div class="card" style="margin-bottom:16px"><div class="card-header">Actualización rápida de km</div><div style="padding:14px"><div style="display:flex;gap:8px"><select id="kmPlaca" style="flex:1"><option value="">Seleccionar vehículo...</option>${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.km?fmt(v.km)+' km':'sin km'}</option>`).join('')}</select><input type="number" id="kmNuevo" placeholder="Km nuevo" style="width:130px"/><button class="btn btn-sm" onclick="actualizarKm()">Actualizar</button></div></div></div>
   <div style="font-size:13px;color:#888;margin-bottom:12px">Ingresa el km del último mantenimiento por vehículo. Se guarda automáticamente.</div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${btns}</div>
