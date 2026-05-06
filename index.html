@@ -983,6 +983,7 @@ async function renderOperacion() {
 
   // Disponibilidad de hoy
   const dispHoy = disponibilidadList.find(d => d.fecha === hoy);
+  window._hoyDisp = hoy;
   const disponiblesHoy = dispHoy ? dispHoy.disponibles : [];
 
   // Fallas del mes
@@ -1022,7 +1023,7 @@ async function renderOperacion() {
               + '</div>';
           }).join('') +
         '</div>' +
-        (canEdit ? '<button onclick="window.guardarDisponibilidad(' + JSON.stringify(hoy) + ')" class="btn" style="width:100%">Guardar disponibilidad del dia</button>' : '') +
+        (canEdit ? '<button onclick="window.guardarDisponibilidad(window._hoyDisp)" class="btn" style="width:100%">Guardar disponibilidad del dia</button>' : '') +
       '</div>' +
     '</div>' +
 
