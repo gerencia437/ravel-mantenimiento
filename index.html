@@ -1006,13 +1006,20 @@ async function renderOperacion() {
       '<div style="padding:14px">' +
         '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Marca los vehículos disponibles hoy. Desmarca los que están en taller o fuera de servicio.</div>' +
         '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px">' +
-          vehiculos.map(v => {
+          vehiculos.map(function(v) {
             const disp = disponiblesHoy.includes(v.placa);
-            return '<div onclick="toggleDisp('' + v.placa + '','' + hoy + '')" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1.5px solid ' + (disp?'var(--green)':'var(--border)') + ';background:' + (disp?'var(--green-light)':'#fff') + ';transition:all 0.15s">' +
-              '<div style="font-weight:700;font-size:13px;color:' + (disp?'var(--green-text)':'var(--text)') + '">' + v.placa + '</div>' +
-              '<div style="font-size:11px;color:var(--text-muted)">' + v.conductor.split(' ')[0] + '</div>' +
-              '<div style="font-size:11px;font-weight:600;color:' + (disp?'var(--green-text)':'#ccc') + '">' + (disp?'✓ Disponible':'Sin confirmar') + '</div>' +
-            '</div>';
+            const bg = disp ? 'var(--green-light)' : '#fff';
+            const border = disp ? 'var(--green)' : 'var(--border)';
+            const txtColor = disp ? 'var(--green-text)' : 'var(--text)';
+            const statusColor = disp ? 'var(--green-text)' : '#ccc';
+            const status = disp ? 'Disponible' : 'Sin confirmar';
+            const pla = v.placa;
+            const cond = v.conductor.split(' ')[0];
+            return '<div onclick="window.toggleDisp(' + JSON.stringify(pla) + ',' + JSON.stringify(hoy) + ')" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1.5px solid ' + border + ';background:' + bg + ';transition:all 0.15s">'
+              + '<div style="font-weight:700;font-size:13px;color:' + txtColor + '">' + pla + '</div>'
+              + '<div style="font-size:11px;color:var(--text-muted)">' + cond + '</div>'
+              + '<div style="font-size:11px;font-weight:600;color:' + statusColor + '">' + status + '</div>'
+              + '</div>';
           }).join('') +
         '</div>' +
         (canEdit ? '<button onclick="guardarDisponibilidad('' + hoy + '')" class="btn" style="width:100%">Guardar disponibilidad del día</button>' : '') +
