@@ -1022,7 +1022,7 @@ async function renderOperacion() {
               + '</div>';
           }).join('') +
         '</div>' +
-        (canEdit ? '<button onclick="guardarDisponibilidad('' + hoy + '')" class="btn" style="width:100%">Guardar disponibilidad del día</button>' : '') +
+        (canEdit ? '<button onclick="window.guardarDisponibilidad(' + JSON.stringify(hoy) + ')" class="btn" style="width:100%">Guardar disponibilidad del dia</button>' : '') +
       '</div>' +
     '</div>' +
 
@@ -1063,7 +1063,7 @@ async function renderOperacion() {
                 '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + f.fecha + (f.horaSalida?' · Salida: '+f.horaSalida:'') + (f.horaRegreso?' → '+f.horaRegreso:'') + (duracion?' ('+duracion+')':'') + '</div>' +
                 (f.razon ? '<div style="font-size:12px;margin-top:2px">' + f.razon + '</div>' : '') +
               '</div>' +
-              (canEdit ? '<button onclick="eliminarFalla('' + f.id + '')" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer">Eliminar</button>' : '') +
+              (canEdit ? '<button onclick="window.eliminarFalla(' + JSON.stringify(f.id) + ')" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer">Eliminar</button>' : '') +
             '</div>';
           }).join('')
         ) +
