@@ -1077,6 +1077,20 @@ async function renderOperacion() {
     '</div>';
 
   bindEvents();
+  // Inicializar dispTemp con datos actuales
+  const dispHoyInit = disponibilidadList.find(d => d.fecha === hoy);
+  if (dispTemp[hoy] === undefined) {
+    dispTemp[hoy] = dispHoyInit ? [...(dispHoyInit.disponibles||[])] : [];
+  }
+  // Renderizar grid de disponibilidad
+  renderDispGrid();
+  // Conectar botones
+  setTimeout(function() {
+    const btnTodos = document.getElementById('btnTodos');
+    if (btnTodos) btnTodos.onclick = window.seleccionarTodos;
+    const btnGuardar = document.getElementById('btnGuardarDisp');
+    if (btnGuardar) btnGuardar.onclick = window.guardarDisponibilidad;
+  }, 50);
 }
 
 let dispTemp = {};
