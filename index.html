@@ -353,30 +353,32 @@ async function initData() {
   const kSnap = await getDocs(collection(db, 'kmBase'));
   kSnap.forEach(d => { kmBase[d.id] = d.data(); });
 
-  const rSnap = await getDocs(collection(db, 'registros'));
-  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.ts||0)-(a.ts||0));
+  // Cargar en paralelo para mayor velocidad
+  const [rSnap, tSnap, pSnapRes, fallasSnap, dispSnap] = await Promise.all([
+    getDocs(collection(db, 'registros')),
+    getDoc(doc(db, 'config', 'talleres')),
+    getDocs(query(collection(db, 'preoperacionales'), orderBy('fecha','desc'))).catch(()=>({docs:[]})),
+    getDocs(collection(db, 'fallas')).catch(()=>({docs:[]})),
+    getDocs(collection(db, 'disponibilidad')).catch(()=>({docs:[]}))
+  ]);
 
-  const tSnap = await getDoc(doc(db, 'config', 'talleres'));
+  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.ts||0)-(a.ts||0));
   if (tSnap.exists()) talleres = tSnap.data().lista;
 
-  // Preoperacionales recientes (últimos 30 días)
   const hoy = new Date();
-  const hace30 = new Date(hoy - 30*24*60*60*1000).toISOString().split("T")[0];
-  try {
-    const pSnap = await getDocs(query(collection(db, "preoperacionales"), orderBy("fecha","desc")));
-    preoperacionales = pSnap.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
-  } catch(e) { preoperacionales = []; }
+  const hace30 = new Date(hoy - 30*24*60*60*1000).toISOString().split('T')[0];
+  preoperacionales = pSnapRes.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
 
-  // Cargar fallas y disponibilidad
-  try {
-    const snapF = await getDocs(collection(db, 'fallas'));
-    fallasList = snapF.docs.map(d => ({id:d.id,...d.data()}));
-    const snapD = await getDocs(collection(db, 'disponibilidad'));
-    disponibilidadList = snapD.docs.map(d => ({id:d.id,...d.data()}));
-  } catch(e) {}
+  fallasList = fallasSnap.docs.map(d => ({id:d.id,...d.data()}));
+  disponibilidadList = dispSnap.docs.map(d => ({id:d.id,...d.data()}));
 
-  // Cargar historial de conductores
-  await cargarHistorialConductores();
+  // Cargar historial de conductores en paralelo
+  const hcSnap = await getDocs(collection(db, 'historialConductores')).catch(()=>({docs:[]}));
+  if (hcSnap.docs.length > 0) {
+    historialConductores = hcSnap.docs.map(d => ({id:d.id,...d.data()}));
+  } else {
+    await cargarHistorialConductores();
+  }
 
   histPlaca = vehiculos[0]?.placa || '';
   document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · ${currentUser ? currentUser.nombre : ''} · 2026`;
@@ -1025,14 +1027,14 @@ async function renderOperacion() {
           vehiculos.map(v => '<option value="' + v.placa + '">' + v.placa + ' — ' + v.conductor + '</option>').join('') +
         '</select>' +
         '<div>' +
-          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora salida</label>' +
+          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora inicial</label>' +
           '<div style="display:flex;gap:6px">' +
             '<input type="date" id="fFechaSalida" value="' + hoy + '" style="flex:1"/>' +
             '<input type="time" id="fHoraSalida" style="width:110px"/>' +
           '</div>' +
         '</div>' +
         '<div>' +
-          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora regreso</label>' +
+          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora final</label>' +
           '<div style="display:flex;gap:6px">' +
             '<input type="date" id="fFechaRegreso" value="' + hoy + '" style="flex:1"/>' +
             '<input type="time" id="fHoraRegreso" style="width:110px"/>' +
@@ -1146,15 +1148,14 @@ window.guardarDisponibilidad = async function() {
 }
 
 window.guardarFalla = async function() {
-  const placa = document.getElementById('fPlaca').value;
-  const fecha = document.getElementById('fFecha').value;
-  const tipo = document.getElementById('fTipo').value;
-  const razon = document.getElementById('fRazon').value;
-  const horaSalida = document.getElementById('fHoraSalida').value;
-  const horaRegreso = document.getElementById('fHoraRegreso').value;
-  const fechaSalida = document.getElementById('fFechaSalida') ? document.getElementById('fFechaSalida').value : fecha;
-  const fechaRegreso = document.getElementById('fFechaRegreso') ? document.getElementById('fFechaRegreso').value : fecha;
-  if (!placa || !fechaSalida || !tipo) { toast('Completa placa, fecha y tipo'); return; }
+  const placa = document.getElementById('fPlaca') ? document.getElementById('fPlaca').value : '';
+  const tipo = document.getElementById('fTipo') ? document.getElementById('fTipo').value : '';
+  const razon = document.getElementById('fRazon') ? document.getElementById('fRazon').value : '';
+  const horaSalida = document.getElementById('fHoraSalida') ? document.getElementById('fHoraSalida').value : '';
+  const horaRegreso = document.getElementById('fHoraRegreso') ? document.getElementById('fHoraRegreso').value : '';
+  const fechaSalida = document.getElementById('fFechaSalida') ? document.getElementById('fFechaSalida').value : '';
+  const fechaRegreso = document.getElementById('fFechaRegreso') ? document.getElementById('fFechaRegreso').value : '';
+  if (!placa || !fechaSalida || !tipo) { toast('Completa placa, fecha inicial y tipo'); return; }
   const v = vehiculos.find(x => x.placa === placa);
   await addDoc(collection(db, 'fallas'), {
     placa, fecha: fechaSalida, fechaSalida, horaSalida, fechaRegreso, horaRegreso, tipo, razon,
