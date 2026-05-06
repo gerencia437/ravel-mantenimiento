@@ -1337,6 +1337,7 @@ async function renderProgramacion() {
               (p.obs ? '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;font-style:italic">' + p.obs + '</div>' : '') +
             '</div>' +
             (canEdit ? '<div style="display:flex;gap:6px;align-items:center">' +
+              '<button onclick="editarProg(\'' + p.id + '\')" style="padding:5px 10px;font-size:11px;background:var(--blue-light);color:var(--blue);border:1px solid #c0d8f0;border-radius:6px;cursor:pointer;font-weight:600">Editar</button>' +
               '<button onclick="completarProg(\'' + p.id + '\')" style="padding:5px 10px;font-size:11px;background:var(--green-light);color:var(--green-text);border:1px solid var(--green);border-radius:6px;cursor:pointer;font-weight:600">✓ Completado</button>' +
               '<button onclick="eliminarProg(\'' + p.id + '\')" style="padding:5px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer;font-weight:600">Eliminar</button>' +
             '</div>' : '') +
@@ -1387,6 +1388,91 @@ window.guardarProgramacion = async function() {
   });
   toast('Programación guardada ✓');
   renderProgramacion();
+}
+
+window.editarProg = function(id) {
+  const p = programaciones.find(x => x.id === id);
+  if (!p) return;
+  const old = document.getElementById('editProgModal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'editProgModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'background:var(--green);padding:16px 20px;color:#fff;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center';
+  header.textContent = 'Editar programación — ' + p.placa;
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'x';
+  closeBtn.style.cssText = 'background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px';
+  closeBtn.onclick = function() { overlay.remove(); };
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:10px';
+
+  function mkField(id, type, label, value) {
+    const wrap = document.createElement('div');
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px';
+    lbl.textContent = label;
+    const el = document.createElement('input');
+    el.id = id; el.type = type;
+    el.value = value || '';
+    el.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+    wrap.appendChild(lbl); wrap.appendChild(el);
+    return wrap;
+  }
+
+  body.appendChild(mkField('epFecha', 'date', 'Fecha estimada', p.fechaEstimada));
+  body.appendChild(mkField('epMotivo', 'text', 'Motivo / trabajo', p.motivo));
+  body.appendChild(mkField('epHoraInicio', 'time', 'Hora inicio', p.horaInicio||''));
+  body.appendChild(mkField('epHoraFin', 'time', 'Hora fin estimada', p.horaFin||''));
+
+  const selPrioridad = document.createElement('select');
+  selPrioridad.id = 'epPrioridad';
+  selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+  ['Normal','Urgente','Programado'].forEach(function(t) {
+    const op = document.createElement('option');
+    op.value = t; op.textContent = t;
+    if (p.prioridad === t) op.selected = true;
+    selPrioridad.appendChild(op);
+  });
+  body.appendChild(selPrioridad);
+
+  const txtObs = document.createElement('textarea');
+  txtObs.id = 'epObs'; txtObs.rows = 2;
+  txtObs.placeholder = 'Observaciones...';
+  txtObs.value = p.obs || '';
+  txtObs.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%;resize:vertical';
+  body.appendChild(txtObs);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Guardar cambios';
+  saveBtn.style.cssText = 'padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer';
+  saveBtn.onclick = async function() {
+    await setDoc(doc(db, 'programaciones', id), {
+      fechaEstimada: document.getElementById('epFecha').value,
+      fechaIngreso: document.getElementById('epFecha').value,
+      motivo: document.getElementById('epMotivo').value,
+      horaInicio: document.getElementById('epHoraInicio').value,
+      horaFin: document.getElementById('epHoraFin').value,
+      prioridad: document.getElementById('epPrioridad').value,
+      obs: document.getElementById('epObs').value
+    }, { merge: true });
+    overlay.remove();
+    toast('Programación actualizada ✓');
+    renderProgramacion();
+  };
+  body.appendChild(saveBtn);
+
+  card.appendChild(header); card.appendChild(body);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 window.completarProg = async function(id) {
@@ -1471,6 +1557,91 @@ window.guardarProgramacion = async function() {
   });
   toast('Programación guardada ✓');
   renderProgramacion();
+}
+
+window.editarProg = function(id) {
+  const p = programaciones.find(x => x.id === id);
+  if (!p) return;
+  const old = document.getElementById('editProgModal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'editProgModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'background:var(--green);padding:16px 20px;color:#fff;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center';
+  header.textContent = 'Editar programación — ' + p.placa;
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'x';
+  closeBtn.style.cssText = 'background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px';
+  closeBtn.onclick = function() { overlay.remove(); };
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:10px';
+
+  function mkField(id, type, label, value) {
+    const wrap = document.createElement('div');
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px';
+    lbl.textContent = label;
+    const el = document.createElement('input');
+    el.id = id; el.type = type;
+    el.value = value || '';
+    el.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+    wrap.appendChild(lbl); wrap.appendChild(el);
+    return wrap;
+  }
+
+  body.appendChild(mkField('epFecha', 'date', 'Fecha estimada', p.fechaEstimada));
+  body.appendChild(mkField('epMotivo', 'text', 'Motivo / trabajo', p.motivo));
+  body.appendChild(mkField('epHoraInicio', 'time', 'Hora inicio', p.horaInicio||''));
+  body.appendChild(mkField('epHoraFin', 'time', 'Hora fin estimada', p.horaFin||''));
+
+  const selPrioridad = document.createElement('select');
+  selPrioridad.id = 'epPrioridad';
+  selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+  ['Normal','Urgente','Programado'].forEach(function(t) {
+    const op = document.createElement('option');
+    op.value = t; op.textContent = t;
+    if (p.prioridad === t) op.selected = true;
+    selPrioridad.appendChild(op);
+  });
+  body.appendChild(selPrioridad);
+
+  const txtObs = document.createElement('textarea');
+  txtObs.id = 'epObs'; txtObs.rows = 2;
+  txtObs.placeholder = 'Observaciones...';
+  txtObs.value = p.obs || '';
+  txtObs.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%;resize:vertical';
+  body.appendChild(txtObs);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Guardar cambios';
+  saveBtn.style.cssText = 'padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer';
+  saveBtn.onclick = async function() {
+    await setDoc(doc(db, 'programaciones', id), {
+      fechaEstimada: document.getElementById('epFecha').value,
+      fechaIngreso: document.getElementById('epFecha').value,
+      motivo: document.getElementById('epMotivo').value,
+      horaInicio: document.getElementById('epHoraInicio').value,
+      horaFin: document.getElementById('epHoraFin').value,
+      prioridad: document.getElementById('epPrioridad').value,
+      obs: document.getElementById('epObs').value
+    }, { merge: true });
+    overlay.remove();
+    toast('Programación actualizada ✓');
+    renderProgramacion();
+  };
+  body.appendChild(saveBtn);
+
+  card.appendChild(header); card.appendChild(body);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 window.completarProg = async function(id) {
