@@ -210,7 +210,7 @@ let preoperacionales = [];
 let currentUser = null; // { cedula, nombre }
 
 const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores","Usuarios"];
- const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores"];
+const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
 const $ = id => document.getElementById(id);
@@ -1002,28 +1002,15 @@ async function renderOperacion() {
     '<div class="card" style="margin-bottom:16px">' +
       '<div class="card-header">' +
         '<span>Disponibilidad diaria — ' + hoy + '</span>' +
-        '<span style="font-size:12px;color:var(--text-muted)">' + disponiblesHoy.length + ' / ' + vehiculos.length + ' disponibles</span>' +
+        '<span id="dispCount" style="font-size:12px;color:var(--text-muted)">' + disponiblesHoy.length + ' / ' + vehiculos.length + ' disponibles</span>' +
       '</div>' +
       '<div style="padding:14px">' +
-        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Marca los vehículos disponibles hoy. Desmarca los que están en taller o fuera de servicio.</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px">' +
-          vehiculos.map(function(v) {
-            const disp = disponiblesHoy.includes(v.placa);
-            const bg = disp ? 'var(--green-light)' : '#fff';
-            const border = disp ? 'var(--green)' : 'var(--border)';
-            const txtColor = disp ? 'var(--green-text)' : 'var(--text)';
-            const statusColor = disp ? 'var(--green-text)' : '#ccc';
-            const status = disp ? 'Disponible' : 'Sin confirmar';
-            const pla = v.placa;
-            const cond = v.conductor.split(' ')[0];
-            return '<div onclick="window.toggleDisp(' + JSON.stringify(pla) + ',' + JSON.stringify(hoy) + ')" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1.5px solid ' + border + ';background:' + bg + ';transition:all 0.15s">'
-              + '<div style="font-weight:700;font-size:13px;color:' + txtColor + '">' + pla + '</div>'
-              + '<div style="font-size:11px;color:var(--text-muted)">' + cond + '</div>'
-              + '<div style="font-size:11px;font-weight:600;color:' + statusColor + '">' + status + '</div>'
-              + '</div>';
-          }).join('') +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<div style="font-size:12px;color:var(--text-muted)">Toca cada vehículo para marcar/desmarcar.</div>' +
+          '<button id="btnTodos" style="padding:5px 12px;font-size:12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✓ Todos</button>' +
         '</div>' +
-        (canEdit ? '<button onclick="window.guardarDisponibilidad(window._hoyDisp)" class="btn" style="width:100%">Guardar disponibilidad del dia</button>' : '') +
+        '<div id="dispGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px"></div>' +
+        (canEdit ? '<button id="btnGuardarDisp" style="width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Guardar disponibilidad</button>' : '') +
       '</div>' +
     '</div>' +
 
@@ -1037,9 +1024,20 @@ async function renderOperacion() {
         '<select id="fPlaca"><option value="">Seleccionar vehículo</option>' +
           vehiculos.map(v => '<option value="' + v.placa + '">' + v.placa + ' — ' + v.conductor + '</option>').join('') +
         '</select>' +
-        '<input type="date" id="fFecha" value="' + hoy + '"/>' +
-        '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora salida de servicio</label><input type="time" id="fHoraSalida" style="width:100%"/></div>' +
-        '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora regreso al servicio</label><input type="time" id="fHoraRegreso" style="width:100%"/></div>' +
+        '<div>' +
+          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora salida</label>' +
+          '<div style="display:flex;gap:6px">' +
+            '<input type="date" id="fFechaSalida" value="' + hoy + '" style="flex:1"/>' +
+            '<input type="time" id="fHoraSalida" style="width:110px"/>' +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Fecha y hora regreso</label>' +
+          '<div style="display:flex;gap:6px">' +
+            '<input type="date" id="fFechaRegreso" value="' + hoy + '" style="flex:1"/>' +
+            '<input type="time" id="fHoraRegreso" style="width:110px"/>' +
+          '</div>' +
+        '</div>' +
         '<select id="fTipo" style="grid-column:1/-1"><option value="">Tipo de falla</option><option>Falla mecánica</option><option>Falla eléctrica</option><option>Accidente de tránsito</option><option>Daño de llanta</option><option>Falla de frenos</option><option>Recalentamiento</option><option>Otra</option></select>' +
         '<textarea id="fRazon" placeholder="Descripción de la falla y acciones tomadas..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>' +
         '<button class="btn" style="grid-column:1/-1" onclick="guardarFalla()">Registrar falla</button>' +
@@ -1055,16 +1053,23 @@ async function renderOperacion() {
               const mins = (hr*60+mr)-(hs*60+ms);
               if (mins > 0) duracion = mins + ' min fuera de servicio';
             }
+            const salidaStr = (f.fechaSalida||f.fecha||'') + (f.horaSalida?' '+f.horaSalida:'');
+            const regresoStr = (f.fechaRegreso||'') + (f.horaRegreso?' '+f.horaRegreso:'');
             return '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px">' +
               '<div style="flex:1">' +
-                '<div style="display:flex;gap:8px;align-items:center">' +
+                '<div style="display:flex;gap:8px;align-items:center;margin-bottom:3px">' +
                   '<span style="font-weight:700;font-size:13px">' + f.placa + '</span>' +
                   '<span style="font-size:11px;background:var(--red-light);color:var(--red);padding:2px 8px;border-radius:20px;font-weight:600">' + (f.tipo||'Falla') + '</span>' +
                 '</div>' +
-                '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + f.fecha + (f.horaSalida?' · Salida: '+f.horaSalida:'') + (f.horaRegreso?' → '+f.horaRegreso:'') + (duracion?' ('+duracion+')':'') + '</div>' +
-                (f.razon ? '<div style="font-size:12px;margin-top:2px">' + f.razon + '</div>' : '') +
+                '<div style="font-size:12px;color:var(--text-muted)">Salida: ' + (salidaStr||'sin fecha') + '</div>' +
+                '<div style="font-size:12px;color:var(--text-muted)">Regreso: ' + (regresoStr||'sin registrar') + (duracion?' ('+duracion+')':'') + '</div>' +
+                (f.razon ? '<div style="font-size:12px;margin-top:2px;color:var(--text)">' + f.razon + '</div>' : '') +
+                (f.conductor ? '<div style="font-size:11px;color:var(--text-muted)">' + f.conductor + '</div>' : '') +
               '</div>' +
-              (canEdit ? '<button onclick="window.eliminarFalla(' + JSON.stringify(f.id) + ')" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer">Eliminar</button>' : '') +
+              (canEdit ? '<div style="display:flex;gap:6px;align-items:center">' +
+                '<button onclick="window.editarFalla(' + JSON.stringify(f.id) + ')" style="padding:4px 10px;font-size:11px;background:var(--blue-light);color:var(--blue);border:1px solid #c0d8f0;border-radius:6px;cursor:pointer;font-weight:600">Editar</button>' +
+                '<button onclick="window.eliminarFalla(' + JSON.stringify(f.id) + ')" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer">Eliminar</button>' +
+              '</div>' : '') +
             '</div>';
           }).join('')
         ) +
@@ -1074,36 +1079,56 @@ async function renderOperacion() {
   bindEvents();
 }
 
-// Toggle disponibilidad en memoria antes de guardar
 let dispTemp = {};
 window.toggleDisp = function(placa, fecha) {
   if (!dispTemp[fecha]) {
-    // Cargar estado actual
     const dispHoy = disponibilidadList.find(d => d.fecha === fecha);
     dispTemp[fecha] = dispHoy ? [...(dispHoy.disponibles||[])] : [];
   }
   const idx = dispTemp[fecha].indexOf(placa);
   if (idx >= 0) dispTemp[fecha].splice(idx, 1);
   else dispTemp[fecha].push(placa);
-  // Re-renderizar solo los chips
-  renderOperacion();
+  renderDispGrid();
 }
 
-window.guardarDisponibilidad = async function(fecha) {
-  const disponibles = dispTemp[fecha] || (() => {
-    const d = disponibilidadList.find(x => x.fecha === fecha);
-    return d ? d.disponibles : [];
-  })();
-  // Buscar si ya existe registro para esa fecha
-  const existing = disponibilidadList.find(d => d.fecha === fecha);
+function renderDispGrid() {
+  const grid = document.getElementById('dispGrid');
+  const countEl = document.getElementById('dispCount');
+  if (!grid) return;
+  const hoy = window._hoyDisp;
+  const disponibles = dispTemp[hoy] || [];
+  grid.innerHTML = '';
+  vehiculos.forEach(function(v) {
+    const disp = disponibles.includes(v.placa);
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:8px 10px;border-radius:8px;cursor:pointer;border:1.5px solid ' + (disp?'var(--green)':'var(--border)') + ';background:' + (disp?'var(--green-light)':'#fff') + ';transition:all 0.15s';
+    div.innerHTML = '<div style="font-weight:700;font-size:13px;color:' + (disp?'var(--green-text)':'var(--text)') + '">' + v.placa + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted)">' + v.conductor.split(' ')[0] + '</div>' +
+      '<div style="font-size:11px;font-weight:600;color:' + (disp?'var(--green-text)':'#ccc') + '">' + (disp?'✓ Disponible':'Sin confirmar') + '</div>';
+    div.onclick = function() { window.toggleDisp(v.placa, hoy); };
+    grid.appendChild(div);
+  });
+  if (countEl) countEl.textContent = disponibles.length + ' / ' + vehiculos.length + ' disponibles';
+}
+
+window.seleccionarTodos = function() {
+  const hoy = window._hoyDisp;
+  dispTemp[hoy] = vehiculos.map(v => v.placa);
+  renderDispGrid();
+}
+
+window.guardarDisponibilidad = async function() {
+  const hoy = window._hoyDisp;
+  const disponibles = dispTemp[hoy] || [];
+  const existing = disponibilidadList.find(d => d.fecha === hoy);
   if (existing) {
-    await setDoc(doc(db, 'disponibilidad', existing.id), { fecha, disponibles, ts: Date.now() }, { merge: true });
+    await setDoc(doc(db, 'disponibilidad', existing.id), { fecha: hoy, disponibles, ts: Date.now() }, { merge: true });
+    existing.disponibles = disponibles;
   } else {
-    await addDoc(collection(db, 'disponibilidad'), { fecha, disponibles, ts: Date.now() });
+    const ref = await addDoc(collection(db, 'disponibilidad'), { fecha: hoy, disponibles, ts: Date.now() });
+    disponibilidadList.push({ id: ref.id, fecha: hoy, disponibles });
   }
-  delete dispTemp[fecha];
-  toast('Disponibilidad guardada: ' + disponibles.length + ' vehículos ✓');
-  renderOperacion();
+  toast('Disponibilidad guardada: ' + disponibles.length + ' vehiculos');
 }
 
 window.guardarFalla = async function() {
@@ -1113,16 +1138,104 @@ window.guardarFalla = async function() {
   const razon = document.getElementById('fRazon').value;
   const horaSalida = document.getElementById('fHoraSalida').value;
   const horaRegreso = document.getElementById('fHoraRegreso').value;
-  if (!placa || !fecha || !tipo) { toast('Completa placa, fecha y tipo'); return; }
+  const fechaSalida = document.getElementById('fFechaSalida') ? document.getElementById('fFechaSalida').value : fecha;
+  const fechaRegreso = document.getElementById('fFechaRegreso') ? document.getElementById('fFechaRegreso').value : fecha;
+  if (!placa || !fechaSalida || !tipo) { toast('Completa placa, fecha y tipo'); return; }
   const v = vehiculos.find(x => x.placa === placa);
   await addDoc(collection(db, 'fallas'), {
-    placa, fecha, tipo, razon, horaSalida, horaRegreso,
+    placa, fecha: fechaSalida, fechaSalida, horaSalida, fechaRegreso, horaRegreso, tipo, razon,
     conductor: v ? v.conductor : '',
     registradoPor: currentUser ? currentUser.nombre : '',
     ts: Date.now()
   });
   toast('Falla registrada ✓');
   renderOperacion();
+}
+
+window.editarFalla = function(id) {
+  const f = fallasList.find(x => x.id === id);
+  if (!f) return;
+  const old = document.getElementById('editFallaModal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'editFallaModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:14px;width:100%;max-width:480px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'background:var(--green);padding:16px 20px;color:#fff;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center';
+  header.textContent = 'Editar falla — ' + f.placa;
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'x';
+  closeBtn.style.cssText = 'background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px';
+  closeBtn.onclick = function() { overlay.remove(); };
+  header.appendChild(closeBtn);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'padding:16px;display:flex;flex-direction:column;gap:10px';
+
+  function mkInput(id, type, label, value) {
+    const wrap = document.createElement('div');
+    const lbl = document.createElement('label');
+    lbl.style.cssText = 'font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px';
+    lbl.textContent = label;
+    const el = document.createElement('input');
+    el.id = id; el.type = type || 'text';
+    el.value = value || '';
+    el.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+    wrap.appendChild(lbl);
+    wrap.appendChild(el);
+    return wrap;
+  }
+
+  body.appendChild(mkInput('efFechaSalida', 'date', 'Fecha salida', f.fechaSalida||f.fecha||''));
+  body.appendChild(mkInput('efHoraSalida', 'time', 'Hora salida', f.horaSalida||''));
+  body.appendChild(mkInput('efFechaRegreso', 'date', 'Fecha regreso', f.fechaRegreso||''));
+  body.appendChild(mkInput('efHoraRegreso', 'time', 'Hora regreso', f.horaRegreso||''));
+
+  const selTipo = document.createElement('select');
+  selTipo.id = 'efTipo';
+  selTipo.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
+  ['Falla mecánica','Falla eléctrica','Accidente de tránsito','Daño de llanta','Falla de frenos','Recalentamiento','Otra'].forEach(function(t) {
+    const op = document.createElement('option');
+    op.value = t; op.textContent = t;
+    if (f.tipo === t) op.selected = true;
+    selTipo.appendChild(op);
+  });
+  body.appendChild(selTipo);
+
+  const txtRazon = document.createElement('textarea');
+  txtRazon.id = 'efRazon';
+  txtRazon.rows = 3;
+  txtRazon.placeholder = 'Descripción...';
+  txtRazon.value = f.razon || '';
+  txtRazon.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%;resize:vertical';
+  body.appendChild(txtRazon);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Guardar cambios';
+  saveBtn.style.cssText = 'padding:11px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer';
+  saveBtn.onclick = async function() {
+    const fechaSalida = document.getElementById('efFechaSalida').value;
+    const horaSalida = document.getElementById('efHoraSalida').value;
+    const fechaRegreso = document.getElementById('efFechaRegreso').value;
+    const horaRegreso = document.getElementById('efHoraRegreso').value;
+    const tipo = document.getElementById('efTipo').value;
+    const razon = document.getElementById('efRazon').value;
+    await setDoc(doc(db, 'fallas', id), { fechaSalida, horaSalida, fechaRegreso, horaRegreso, tipo, razon, fecha: fechaSalida }, { merge: true });
+    overlay.remove();
+    toast('Falla actualizada');
+    renderOperacion();
+  };
+  body.appendChild(saveBtn);
+
+  card.appendChild(header);
+  card.appendChild(body);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 window.eliminarFalla = async function(id) {
