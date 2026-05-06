@@ -367,6 +367,14 @@ async function initData() {
     preoperacionales = pSnap.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
   } catch(e) { preoperacionales = []; }
 
+  // Cargar fallas y disponibilidad
+  try {
+    const snapF = await getDocs(collection(db, 'fallas'));
+    fallasList = snapF.docs.map(d => ({id:d.id,...d.data()}));
+    const snapD = await getDocs(collection(db, 'disponibilidad'));
+    disponibilidadList = snapD.docs.map(d => ({id:d.id,...d.data()}));
+  } catch(e) {}
+
   // Cargar historial de conductores
   await cargarHistorialConductores();
 
@@ -425,6 +433,7 @@ function renderView() {
   else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
   else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
   else if (VIEW === 'Programación') { renderProgramacion(); return; }
+  else if (VIEW === 'Operación') { renderOperacion(); return; }
   else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
   else if (VIEW === 'Conductores') c.innerHTML = renderConductores();
   bindEvents();
@@ -580,6 +589,75 @@ function renderDashboard() {
         '</div>';
       }).join('') +
     '</div>' : '') +
+
+    // ── KPIs DE CALIDAD ──
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-header" style="font-weight:700">KPIs de Calidad — ' + MESES_N[mesActual] + '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">' +
+
+        // KPI 1: Disponibilidad diaria (basada en módulo Operación)
+        (() => {
+          const hoy2 = new Date().toISOString().split('T')[0];
+          const dispReg = (typeof disponibilidadList !== 'undefined' ? disponibilidadList : []).find(d => d.fecha === hoy2);
+          const dispHoy = dispReg ? (dispReg.disponibles||[]).length : 0;
+          const pctDisp = vehiculos.length > 0 ? Math.round((dispHoy / vehiculos.length) * 100) : 0;
+          return '<div style="padding:16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">' +
+            '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Disponibilidad hoy</div>' +
+            '<div style="font-size:28px;font-weight:700;color:' + (pctDisp>=90?'var(--green-text)':pctDisp>=75?'var(--amber)':'var(--red)') + '">' + pctDisp + '%</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">' + dispHoy + ' de ' + vehiculos.length + ' disponibles</div>' +
+            '<div style="margin-top:6px;background:#f0f0f0;border-radius:4px;height:6px"><div style="width:' + pctDisp + '%;height:100%;background:' + (pctDisp>=90?'var(--green)':pctDisp>=75?'var(--amber)':'var(--red)') + ';border-radius:4px"></div></div>' +
+          '</div>';
+        })() +
+
+        // KPI 2: Tasa de fallas en operación del mes (meta ≤ 0,05)
+        (() => {
+          const fallasMesD = (typeof fallasList !== 'undefined' ? fallasList : []).filter(f => {
+            const d = new Date(f.fecha);
+            return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+          });
+          const tasa = vehiculos.length > 0 ? (fallasMesD.length / vehiculos.length) : 0;
+          const tasaDisplay = tasa.toFixed(2);
+          const cumple = tasa <= 0.05;
+          return '<div style="padding:16px;border-bottom:1px solid var(--border)">' +
+            '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Fallas en operación</div>' +
+            '<div style="font-size:28px;font-weight:700;color:' + (cumple?'var(--green-text)':'var(--red)') + '">' + tasaDisplay + '</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">' + fallasMesD.length + ' fallas · Meta ≤ 0,05 · ' + (cumple?'✓ Cumple':'✗ No cumple') + '</div>' +
+          '</div>';
+        })() +
+
+        // KPI 3: Cumplimiento preventivo
+        (() => {
+          const progMes = programaciones.filter(p => {
+            const d = new Date(p.fechaEstimada);
+            return d.getMonth() === mesActual && d.getFullYear() === anioActual && p.prioridad === 'Programado';
+          });
+          const completados = progMes.filter(p => p.estado === 'Completado').length;
+          const pct = progMes.length > 0 ? Math.round((completados / progMes.length) * 100) : 0;
+          return '<div style="padding:16px;border-right:1px solid var(--border)">' +
+            '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Preventivo ' + MESES_N[mesActual] + '</div>' +
+            '<div style="font-size:28px;font-weight:700;color:' + (pct>=90?'var(--green-text)':pct>=70?'var(--amber)':'var(--red)') + '">' + pct + '%</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">' + completados + ' de ' + progMes.length + ' programados cumplidos</div>' +
+            '<div style="margin-top:6px;background:#f0f0f0;border-radius:4px;height:6px"><div style="width:' + pct + '%;height:100%;background:' + (pct>=90?'var(--green)':pct>=70?'var(--amber)':'var(--red)') + ';border-radius:4px"></div></div>' +
+          '</div>';
+        })() +
+
+        // KPI 4: Inmovilización del mes
+        (() => {
+          const progMes = programaciones.filter(p => {
+            const d = new Date(p.fechaEstimada);
+            return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+          });
+          const totalDias = progMes.reduce((s, p) => s + (p.diasInmovilizado || 0), 0);
+          const vehicInmov = progMes.filter(p => p.diasInmovilizado > 0).length;
+          return '<div style="padding:16px">' +
+            '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px">Inmovilización ' + MESES_N[mesActual] + '</div>' +
+            '<div style="font-size:28px;font-weight:700;color:' + (totalDias===0?'var(--green-text)':totalDias<=5?'var(--amber)':'var(--red)') + '">' + totalDias + ' días</div>' +
+            '<div style="font-size:12px;color:var(--text-muted)">' + vehicInmov + ' vehículos estuvieron en taller</div>' +
+          '</div>';
+        })() +
+
+      '</div>' +
+    '</div>' +
 
     // Alertas críticas vencidas
     (criticos.length > 0 ? '<div class="card">' +
@@ -886,6 +964,167 @@ window.guardarPreoperacional = async function() {
 };
 
 
+// ── MÓDULO OPERACIÓN ──
+let fallasList = [];
+let disponibilidadList = [];
+
+async function renderOperacion() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="loading">Cargando...</div>';
+  try {
+    const snapF = await getDocs(collection(db, 'fallas'));
+    fallasList = snapF.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    const snapD = await getDocs(collection(db, 'disponibilidad'));
+    disponibilidadList = snapD.docs.map(d => ({id:d.id,...d.data()}));
+  } catch(e) { fallasList = []; disponibilidadList = []; }
+
+  const canEdit = currentUser && (currentUser.rol === 'superadmin' || currentUser.rol === 'tecnico');
+  const hoy = new Date().toISOString().split('T')[0];
+
+  // Disponibilidad de hoy
+  const dispHoy = disponibilidadList.find(d => d.fecha === hoy);
+  const disponiblesHoy = dispHoy ? dispHoy.disponibles : [];
+
+  // Fallas del mes
+  const mesActual = new Date().getMonth();
+  const anioActual = new Date().getFullYear();
+  const fallasMes = fallasList.filter(f => {
+    const d = new Date(f.fecha);
+    return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+  });
+  const tasaFallas = vehiculos.length > 0 ? (fallasMes.length / vehiculos.length) : 0;
+  const tasaStr = tasaFallas.toFixed(2);
+  const tasaColor = tasaFallas <= 0.05 ? 'var(--green-text)' : 'var(--red)';
+
+  c.innerHTML =
+    // ── SECCIÓN 1: DISPONIBILIDAD DIARIA ──
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-header">' +
+        '<span>Disponibilidad diaria — ' + hoy + '</span>' +
+        '<span style="font-size:12px;color:var(--text-muted)">' + disponiblesHoy.length + ' / ' + vehiculos.length + ' disponibles</span>' +
+      '</div>' +
+      '<div style="padding:14px">' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Marca los vehículos disponibles hoy. Desmarca los que están en taller o fuera de servicio.</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px">' +
+          vehiculos.map(v => {
+            const disp = disponiblesHoy.includes(v.placa);
+            return '<div onclick="toggleDisp('' + v.placa + '','' + hoy + '')" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1.5px solid ' + (disp?'var(--green)':'var(--border)') + ';background:' + (disp?'var(--green-light)':'#fff') + ';transition:all 0.15s">' +
+              '<div style="font-weight:700;font-size:13px;color:' + (disp?'var(--green-text)':'var(--text)') + '">' + v.placa + '</div>' +
+              '<div style="font-size:11px;color:var(--text-muted)">' + v.conductor.split(' ')[0] + '</div>' +
+              '<div style="font-size:11px;font-weight:600;color:' + (disp?'var(--green-text)':'#ccc') + '">' + (disp?'✓ Disponible':'Sin confirmar') + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        (canEdit ? '<button onclick="guardarDisponibilidad('' + hoy + '')" class="btn" style="width:100%">Guardar disponibilidad del día</button>' : '') +
+      '</div>' +
+    '</div>' +
+
+    // ── SECCIÓN 2: FALLAS EN OPERACIÓN ──
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-header">' +
+        '<span>Fallas en operación — mes actual</span>' +
+        '<span style="font-size:13px;font-weight:700;color:' + tasaColor + '">Tasa: ' + tasaStr + ' (meta ≤ 0,05)</span>' +
+      '</div>' +
+      (canEdit ? '<div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border-bottom:1px solid var(--border)">' +
+        '<select id="fPlaca"><option value="">Seleccionar vehículo</option>' +
+          vehiculos.map(v => '<option value="' + v.placa + '">' + v.placa + ' — ' + v.conductor + '</option>').join('') +
+        '</select>' +
+        '<input type="date" id="fFecha" value="' + hoy + '"/>' +
+        '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora salida de servicio</label><input type="time" id="fHoraSalida" style="width:100%"/></div>' +
+        '<div><label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:4px">Hora regreso al servicio</label><input type="time" id="fHoraRegreso" style="width:100%"/></div>' +
+        '<select id="fTipo" style="grid-column:1/-1"><option value="">Tipo de falla</option><option>Falla mecánica</option><option>Falla eléctrica</option><option>Accidente de tránsito</option><option>Daño de llanta</option><option>Falla de frenos</option><option>Recalentamiento</option><option>Otra</option></select>' +
+        '<textarea id="fRazon" placeholder="Descripción de la falla y acciones tomadas..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>' +
+        '<button class="btn" style="grid-column:1/-1" onclick="guardarFalla()">Registrar falla</button>' +
+      '</div>' : '') +
+      '<div>' +
+        (fallasList.length === 0 ? '<div class="empty">No hay fallas registradas</div>' :
+          fallasList.slice(0,20).map(f => {
+            const v = vehiculos.find(x => x.placa === f.placa);
+            let duracion = '';
+            if (f.horaSalida && f.horaRegreso) {
+              const [hs,ms] = f.horaSalida.split(':').map(Number);
+              const [hr,mr] = f.horaRegreso.split(':').map(Number);
+              const mins = (hr*60+mr)-(hs*60+ms);
+              if (mins > 0) duracion = mins + ' min fuera de servicio';
+            }
+            return '<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px">' +
+              '<div style="flex:1">' +
+                '<div style="display:flex;gap:8px;align-items:center">' +
+                  '<span style="font-weight:700;font-size:13px">' + f.placa + '</span>' +
+                  '<span style="font-size:11px;background:var(--red-light);color:var(--red);padding:2px 8px;border-radius:20px;font-weight:600">' + (f.tipo||'Falla') + '</span>' +
+                '</div>' +
+                '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + f.fecha + (f.horaSalida?' · Salida: '+f.horaSalida:'') + (f.horaRegreso?' → '+f.horaRegreso:'') + (duracion?' ('+duracion+')':'') + '</div>' +
+                (f.razon ? '<div style="font-size:12px;margin-top:2px">' + f.razon + '</div>' : '') +
+              '</div>' +
+              (canEdit ? '<button onclick="eliminarFalla('' + f.id + '')" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);border:1px solid #f0bebe;border-radius:6px;cursor:pointer">Eliminar</button>' : '') +
+            '</div>';
+          }).join('')
+        ) +
+      '</div>' +
+    '</div>';
+
+  bindEvents();
+}
+
+// Toggle disponibilidad en memoria antes de guardar
+let dispTemp = {};
+window.toggleDisp = function(placa, fecha) {
+  if (!dispTemp[fecha]) {
+    // Cargar estado actual
+    const dispHoy = disponibilidadList.find(d => d.fecha === fecha);
+    dispTemp[fecha] = dispHoy ? [...(dispHoy.disponibles||[])] : [];
+  }
+  const idx = dispTemp[fecha].indexOf(placa);
+  if (idx >= 0) dispTemp[fecha].splice(idx, 1);
+  else dispTemp[fecha].push(placa);
+  // Re-renderizar solo los chips
+  renderOperacion();
+}
+
+window.guardarDisponibilidad = async function(fecha) {
+  const disponibles = dispTemp[fecha] || (() => {
+    const d = disponibilidadList.find(x => x.fecha === fecha);
+    return d ? d.disponibles : [];
+  })();
+  // Buscar si ya existe registro para esa fecha
+  const existing = disponibilidadList.find(d => d.fecha === fecha);
+  if (existing) {
+    await setDoc(doc(db, 'disponibilidad', existing.id), { fecha, disponibles, ts: Date.now() }, { merge: true });
+  } else {
+    await addDoc(collection(db, 'disponibilidad'), { fecha, disponibles, ts: Date.now() });
+  }
+  delete dispTemp[fecha];
+  toast('Disponibilidad guardada: ' + disponibles.length + ' vehículos ✓');
+  renderOperacion();
+}
+
+window.guardarFalla = async function() {
+  const placa = document.getElementById('fPlaca').value;
+  const fecha = document.getElementById('fFecha').value;
+  const tipo = document.getElementById('fTipo').value;
+  const razon = document.getElementById('fRazon').value;
+  const horaSalida = document.getElementById('fHoraSalida').value;
+  const horaRegreso = document.getElementById('fHoraRegreso').value;
+  if (!placa || !fecha || !tipo) { toast('Completa placa, fecha y tipo'); return; }
+  const v = vehiculos.find(x => x.placa === placa);
+  await addDoc(collection(db, 'fallas'), {
+    placa, fecha, tipo, razon, horaSalida, horaRegreso,
+    conductor: v ? v.conductor : '',
+    registradoPor: currentUser ? currentUser.nombre : '',
+    ts: Date.now()
+  });
+  toast('Falla registrada ✓');
+  renderOperacion();
+}
+
+window.eliminarFalla = async function(id) {
+  if (!confirm('¿Eliminar este registro de falla?')) return;
+  await deleteDoc(doc(db, 'fallas', id));
+  toast('Falla eliminada ✓');
+  renderOperacion();
+}
+
+
 // ── PROGRAMACIÓN DE TALLER ──
 let programaciones = [];
 let progCargadas = false;
@@ -1006,6 +1245,7 @@ window.guardarProgramacion = async function() {
     placa, fechaEstimada: fecha, motivo, taller, prioridad, obs, horaInicio, horaFin,
     conductor: v ? v.conductor : '',
     estado: 'Pendiente',
+    fechaIngreso: fecha,
     creadoPor: currentUser ? currentUser.nombre : '',
     ts: Date.now()
   });
@@ -1014,7 +1254,20 @@ window.guardarProgramacion = async function() {
 }
 
 window.completarProg = async function(id) {
-  await setDoc(doc(db, 'programaciones', id), { estado: 'Completado', completadoEn: new Date().toISOString() }, { merge: true });
+  const prog = programaciones.find(p => p.id === id);
+  const ahora = new Date().toISOString();
+  const fechaSalida = ahora.split('T')[0];
+  // Calcular días inmovilizado
+  let diasInmov = 0;
+  if (prog && prog.fechaIngreso) {
+    diasInmov = Math.ceil((new Date(fechaSalida) - new Date(prog.fechaIngreso)) / 86400000) + 1;
+  }
+  await setDoc(doc(db, 'programaciones', id), {
+    estado: 'Completado',
+    completadoEn: ahora,
+    fechaSalida: fechaSalida,
+    diasInmovilizado: diasInmov
+  }, { merge: true });
   toast('Marcado como completado ✓');
   renderProgramacion();
 }
@@ -1076,6 +1329,7 @@ window.guardarProgramacion = async function() {
     placa, fechaEstimada: fecha, motivo, taller, prioridad, obs, horaInicio, horaFin,
     conductor: v ? v.conductor : '',
     estado: 'Pendiente',
+    fechaIngreso: fecha,
     creadoPor: currentUser ? currentUser.nombre : '',
     ts: Date.now()
   });
@@ -1084,7 +1338,20 @@ window.guardarProgramacion = async function() {
 }
 
 window.completarProg = async function(id) {
-  await setDoc(doc(db, 'programaciones', id), { estado: 'Completado', completadoEn: new Date().toISOString() }, { merge: true });
+  const prog = programaciones.find(p => p.id === id);
+  const ahora = new Date().toISOString();
+  const fechaSalida = ahora.split('T')[0];
+  // Calcular días inmovilizado
+  let diasInmov = 0;
+  if (prog && prog.fechaIngreso) {
+    diasInmov = Math.ceil((new Date(fechaSalida) - new Date(prog.fechaIngreso)) / 86400000) + 1;
+  }
+  await setDoc(doc(db, 'programaciones', id), {
+    estado: 'Completado',
+    completadoEn: ahora,
+    fechaSalida: fechaSalida,
+    diasInmovilizado: diasInmov
+  }, { merge: true });
   toast('Marcado como completado ✓');
   renderProgramacion();
 }
