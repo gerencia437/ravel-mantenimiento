@@ -135,7 +135,8 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAmfFabMCKEDvZNdpIYA_HpIMAurpT_izg",
@@ -148,6 +149,16 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
+
+// ── PAGINATION ──
+let registrosPage = 1;
+let registroLastDoc = null;
+let hasMoreRegistros = true;
+const REGISTROS_PER_PAGE = 50;
+
+// ── CACHING ──
+let dashboardCache = null;
 
 const INT_BUS = {bateria:null,llantas:null,motor:6000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:6000,correa:6000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:40000,calibValvulas:40000};
 const INT_NPR_EXU = {bateria:null,llantas:null,motor:10000,caja:40000,transmision:40000,frenos:5000,engrase:5000,alternador:10000,correa:10000,alineacion:10000,liqFrenos:40000,liqEmbrague:40000,aceiteDireccion:40000,refrigerante:80000,calibValvulas:80000};
@@ -353,17 +364,15 @@ async function initData() {
   const kSnap = await getDocs(collection(db, 'kmBase'));
   kSnap.forEach(d => { kmBase[d.id] = d.data(); });
 
-  // Cargar en paralelo para mayor velocidad
-  const [rSnap, tSnap, pSnapRes, fallasSnap, dispSnap] = await Promise.all([
-    getDocs(collection(db, 'registros')),
-    getDoc(doc(db, 'config', 'talleres')),
-    getDocs(query(collection(db, 'preoperacionales'), orderBy('fecha','desc'))).catch(()=>({docs:[]})),
-    getDocs(collection(db, 'fallas')).catch(()=>({docs:[]})),
-    getDocs(collection(db, 'disponibilidad')).catch(()=>({docs:[]}))
-  ]);
+  // ── CARGAR REGISTROS CON PAGINATION ──
+  await cargarRegistrosPagina(1);
 
-  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.ts||0)-(a.ts||0));
-  if (tSnap.exists()) talleres = tSnap.data().lista;
+  const tSnap = getDoc(doc(db, 'config', 'talleres'));
+  const pSnapRes = await getDocs(query(collection(db, 'preoperacionales'), orderBy('fecha','desc'))).catch(()=>({docs:[]}));
+  const fallasSnap = await getDocs(collection(db, 'fallas')).catch(()=>({docs:[]}));
+  const dispSnap = await getDocs(collection(db, 'disponibilidad')).catch(()=>({docs:[]}));
+
+  if ((await tSnap).exists()) talleres = (await tSnap).data().lista;
 
   const hoy = new Date();
   const hace30 = new Date(hoy - 30*24*60*60*1000).toISOString().split('T')[0];
@@ -372,7 +381,6 @@ async function initData() {
   fallasList = fallasSnap.docs.map(d => ({id:d.id,...d.data()}));
   disponibilidadList = dispSnap.docs.map(d => ({id:d.id,...d.data()}));
 
-  // Cargar historial de conductores en paralelo
   const hcSnap = await getDocs(collection(db, 'historialConductores')).catch(()=>({docs:[]}));
   if (hcSnap.docs.length > 0) {
     historialConductores = hcSnap.docs.map(d => ({id:d.id,...d.data()}));
@@ -384,6 +392,27 @@ async function initData() {
   document.getElementById('subtitulo').textContent = `${vehiculos.length} vehículos · ${currentUser ? currentUser.nombre : ''} · 2026`;
   renderNav();
   renderView();
+}
+
+// ── PAGINATION FUNCTION ──
+async function cargarRegistrosPagina(page = 1) {
+  let q = query(collection(db, 'registros'), orderBy('ts', 'desc'), limit(REGISTROS_PER_PAGE));
+  
+  if (page > 1 && registroLastDoc) {
+    q = query(collection(db, 'registros'), orderBy('ts', 'desc'), startAfter(registroLastDoc), limit(REGISTROS_PER_PAGE));
+  }
+  
+  const rSnap = await getDocs(q);
+  
+  if (page === 1) {
+    registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } else {
+    registros = [...registros, ...rSnap.docs.map(d => ({ id: d.id, ...d.data() }))];
+  }
+  
+  registroLastDoc = rSnap.docs[rSnap.docs.length - 1];
+  hasMoreRegistros = rSnap.docs.length === REGISTROS_PER_PAGE;
+  registrosPage = page;
 }
 
 async function saveVehiculo(placa, data) {
@@ -402,10 +431,59 @@ async function saveKmBase(placa, data) {
 async function addRegistro(reg) {
   const ref = await addDoc(collection(db, 'registros'), reg);
   registros.unshift({ id: ref.id, ...reg });
+  dashboardCache = null; // Invalidar cache
 }
 
 async function saveTalleres() {
   await setDoc(doc(db, 'config', 'talleres'), { lista: talleres });
+}
+
+// ── STORAGE FUNCTIONS ──
+async function subirFoto(registroId, file) {
+  try {
+    const storagePath = `reparaciones/${registroId}/${Date.now()}-${file.name}`;
+    const fileRef = ref(storage, storagePath);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    return { url, path: storagePath };
+  } catch (err) {
+    console.error('Error subiendo foto:', err);
+    return null;
+  }
+}
+
+async function subirPDF(registroId, file) {
+  try {
+    const storagePath = `documentos/${registroId}/${Date.now()}-${file.name}`;
+    const fileRef = ref(storage, storagePath);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    return { url, path: storagePath };
+  } catch (err) {
+    console.error('Error subiendo PDF:', err);
+    return null;
+  }
+}
+
+async function guardarFotoEnRegistro(registroId, fotoUrl) {
+  const reg = registros.find(r => r.id === registroId);
+  if (reg) {
+    if (!reg.fotos) reg.fotos = [];
+    reg.fotos.push(fotoUrl);
+    await updateDoc(doc(db, 'registros', registroId), { fotos: reg.fotos });
+    dashboardCache = null;
+  }
+}
+
+async function guardarPDFEnRegistro(registroId, pdfUrl, tipo = 'factura') {
+  const reg = registros.find(r => r.id === registroId);
+  if (reg) {
+    if (!reg.documentos) reg.documentos = {};
+    if (!reg.documentos[tipo]) reg.documentos[tipo] = [];
+    reg.documentos[tipo].push(pdfUrl);
+    await updateDoc(doc(db, 'registros', registroId), { documentos: reg.documentos });
+    dashboardCache = null;
+  }
 }
 
 function getNavItems() {
