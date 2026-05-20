@@ -224,6 +224,27 @@ const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Km base","Regis
 const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
+
+// ════════════════════════════════════════════════════════════════
+// FECHA LOCAL COLOMBIA (UTC-5) — FIX BUG ZONA HORARIA
+// Antes: new Date().toISOString() devolvía el día siguiente
+// despues de las 7pm en Colombia (ya era medianoche UTC).
+// ════════════════════════════════════════════════════════════════
+function hoyLocal() {
+  const f = new Date();
+  return `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
+}
+function parseFechaLocal(s) {
+  if (!s) return new Date();
+  const p = s.split('-').map(Number);
+  return p.length === 3 ? new Date(p[0], p[1]-1, p[2]) : new Date(s);
+}
+function fechaLocal(f) {
+  const d = f instanceof Date ? f : new Date(f);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+// ════════════════════════════════════════════════════════════════
+
 const $ = id => document.getElementById(id);
 const fmt = n => n?.toLocaleString('es-CO') ?? '—';
 const money = n => n > 0 ? '$'+fmt(n) : '—';
@@ -375,7 +396,7 @@ async function initData() {
   if ((await tSnap).exists()) talleres = (await tSnap).data().lista;
 
   const hoy = new Date();
-  const hace30 = new Date(hoy - 30*24*60*60*1000).toISOString().split('T')[0];
+  const hace30 = fechaLocal(new Date(hoy - 30*24*60*60*1000));
   preoperacionales = pSnapRes.docs.map(d => ({id:d.id,...d.data()})).filter(p => p.fecha >= hace30);
 
   fallasList = fallasSnap.docs.map(d => ({id:d.id,...d.data()}));
@@ -533,11 +554,11 @@ function renderDashboard() {
 
   // Registros del mes actual y anterior
   const regMesAct = registros.filter(r => {
-    const d = new Date(r.fecha);
+    const d = parseFechaLocal(r.fecha);
     return d.getMonth() === mesActual && d.getFullYear() === anioActual;
   });
   const regMesAnt = registros.filter(r => {
-    const d = new Date(r.fecha);
+    const d = parseFechaLocal(r.fecha);
     return d.getMonth() === mesAnterior && d.getFullYear() === anioAnterior;
   });
 
@@ -576,7 +597,7 @@ function renderDashboard() {
   });
 
   // Preoperacionales hoy
-  const hoyStr = hoy.toISOString().split('T')[0];
+  const hoyStr = hoyLocal();
   const preoHoy = preoperacionales.filter(p => p.fecha === hoyStr);
   const conNov = preoHoy.filter(p => p.noCumple > 0).length;
   const sinPreo = vehiculos.length - preoHoy.length;
@@ -677,7 +698,7 @@ function renderDashboard() {
 
         // KPI 1: Disponibilidad diaria (basada en módulo Operación)
         (() => {
-          const hoy2 = new Date().toISOString().split('T')[0];
+          const hoy2 = hoyLocal();
           const dispReg = (typeof disponibilidadList !== 'undefined' ? disponibilidadList : []).find(d => d.fecha === hoy2);
           const dispHoy = dispReg ? (dispReg.disponibles||[]).length : 0;
           const pctDisp = vehiculos.length > 0 ? Math.round((dispHoy / vehiculos.length) * 100) : 0;
@@ -692,7 +713,7 @@ function renderDashboard() {
         // KPI 2: Tasa de fallas en operación del mes (meta ≤ 0,05)
         (() => {
           const fallasMesD = (typeof fallasList !== 'undefined' ? fallasList : []).filter(f => {
-            const d = new Date(f.fecha);
+            const d = parseFechaLocal(f.fecha);
             return d.getMonth() === mesActual && d.getFullYear() === anioActual;
           });
           const tasa = vehiculos.length > 0 ? (fallasMesD.length / vehiculos.length) : 0;
@@ -708,7 +729,7 @@ function renderDashboard() {
         // KPI 3: Cumplimiento preventivo
         (() => {
           const progMes = programaciones.filter(p => {
-            const d = new Date(p.fechaEstimada);
+            const d = parseFechaLocal(p.fechaEstimada);
             return d.getMonth() === mesActual && d.getFullYear() === anioActual && p.prioridad === 'Programado';
           });
           const completados = progMes.filter(p => p.estado === 'Completado').length;
@@ -724,7 +745,7 @@ function renderDashboard() {
         // KPI 4: Inmovilización del mes
         (() => {
           const progMes = programaciones.filter(p => {
-            const d = new Date(p.fechaEstimada);
+            const d = parseFechaLocal(p.fechaEstimada);
             return d.getMonth() === mesActual && d.getFullYear() === anioActual;
           });
           const totalDias = progMes.reduce((s, p) => s + (p.diasInmovilizado || 0), 0);
@@ -790,7 +811,7 @@ function renderAlertas() {
   alertas.sort((a, b) => (a.faltante ?? 99999) - (b.faltante ?? 99999));
 
   // Novedades preoperacional hoy
-  const hoy2 = new Date().toISOString().split("T")[0];
+  const hoy2 = hoyLocal();
   const preoHoy = preoperacionales.filter(p => p.fecha === hoy2 && p.noCumple > 0);
   const preoHoyHTML = preoHoy.length > 0 ?
     '<div class="alert-box" style="margin-bottom:16px">' +
@@ -912,7 +933,7 @@ const PREO_MECANICO = [
 let preoData = {};
 
 function renderPreoperacional() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = hoyLocal();
   const v = vehiculos.find(x => x.placa === (preoData.placa || vehiculos[0].placa));
   const placaSel = preoData.placa || vehiculos[0].placa;
 
@@ -1003,7 +1024,7 @@ window.guardarPreoperacional = async function() {
   // Validar km vs día anterior
   const ayer = new Date(fecha);
   ayer.setDate(ayer.getDate() - 1);
-  const ayerStr = ayer.toISOString().split("T")[0];
+  const ayerStr = fechaLocal(ayer);
   const v = vehiculos.find(x => x.placa === placa);
   if (v && km < (v.km || 0)) {
     toast("El km no puede ser menor al registrado anteriormente (" + fmt(v.km) + " km)");
@@ -1059,7 +1080,7 @@ async function renderOperacion() {
   } catch(e) { fallasList = []; disponibilidadList = []; }
 
   const canEdit = currentUser && (currentUser.rol === 'superadmin' || currentUser.rol === 'tecnico');
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyLocal();
 
   // Disponibilidad de hoy
   const dispHoy = disponibilidadList.find(d => d.fecha === hoy);
@@ -1354,7 +1375,7 @@ async function renderProgramacion() {
       .sort((a,b) => (a.fechaEstimada||'').localeCompare(b.fechaEstimada||''));
   } catch(e) { programaciones = []; }
 
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = hoyLocal();
   const pendientes = programaciones.filter(p => p.estado !== 'Completado');
   const completados = programaciones.filter(p => p.estado === 'Completado');
 
@@ -1556,7 +1577,7 @@ window.editarProg = function(id) {
 window.completarProg = async function(id) {
   const prog = programaciones.find(p => p.id === id);
   const ahora = new Date().toISOString();
-  const fechaSalida = ahora.split('T')[0];
+  const fechaSalida = hoyLocal();
   // Calcular días inmovilizado
   let diasInmov = 0;
   if (prog && prog.fechaIngreso) {
@@ -1725,7 +1746,7 @@ window.editarProg = function(id) {
 window.completarProg = async function(id) {
   const prog = programaciones.find(p => p.id === id);
   const ahora = new Date().toISOString();
-  const fechaSalida = ahora.split('T')[0];
+  const fechaSalida = hoyLocal();
   // Calcular días inmovilizado
   let diasInmov = 0;
   if (prog && prog.fechaIngreso) {
@@ -2382,7 +2403,7 @@ window.exportarExcel = function() {
   const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const fecha = new Date().toISOString().split('T')[0];
+  const fecha = hoyLocal();
   a.href = url;
   a.download = 'Historial_Ravel_' + fecha + '.csv';
   document.body.appendChild(a);
@@ -2494,7 +2515,7 @@ window.guardarEdicion = async function(id) {
 // ── INFORME MENSUAL ──
 function renderInforme() {
   const regMes = registros.filter(r => {
-    const d = new Date(r.fecha);
+    const d = parseFechaLocal(r.fecha);
     return d.getMonth() === mesInf && d.getFullYear() === 2026;
   });
   const total = regMes.reduce((s,r)=>s+(r.costo||0),0);
@@ -2583,7 +2604,7 @@ function renderConductores() {
         <option value="">Seleccionar vehículo</option>
         ${vehiculos.map(v=>`<option value="${v.placa}">${v.placa} — ${v.conductor}</option>`).join('')}
       </select>
-      <input type="date" id="cFecha" value="${new Date().toISOString().split('T')[0]}"/>
+      <input type="date" id="cFecha" value="${hoyLocal()}"/>
       <div style="grid-column:1/-1">
         <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:5px">Seleccionar conductor existente</label>
         <select id="cConductorSel" onchange="onConductorSel(this.value)" style="width:100%">
