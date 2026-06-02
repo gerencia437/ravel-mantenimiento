@@ -1398,7 +1398,7 @@ async function renderProgramacion() {
         '<select id="pTaller"><option value="">Seleccionar taller</option>' +
           talleres.map(t => '<option>' + t + '</option>').join('') +
         '</select>' +
-        '<select id="pPrioridad"><option value="Normal">Prioridad Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente</option></select>' +
+        '<select id="pPrioridad"><option value="Normal">Prioridad Normal</option><option value="Programado">Programado</option><option value="Urgente">Urgente</option></select>' +
         '<textarea id="pObs" placeholder="Observaciones adicionales..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>' +
         '<button class="btn" style="grid-column:1/-1" onclick="guardarProgramacion()">Programar vehículo</button>' +
       '</div>' +
@@ -1535,7 +1535,7 @@ window.editarProg = function(id) {
   const selPrioridad = document.createElement('select');
   selPrioridad.id = 'epPrioridad';
   selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
-  ['Normal','Alta','Urgente'].forEach(function(t) {
+  ['Normal','Programado','Urgente'].forEach(function(t) {
     const op = document.createElement('option');
     op.value = t; op.textContent = t;
     if (p.prioridad === t) op.selected = true;
@@ -1705,7 +1705,7 @@ window.editarProg = function(id) {
   const selPrioridad = document.createElement('select');
   selPrioridad.id = 'epPrioridad';
   selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
-  ['Normal','Alta','Urgente'].forEach(function(t) {
+  ['Normal','Programado','Urgente'].forEach(function(t) {
     const op = document.createElement('option');
     op.value = t; op.textContent = t;
     if (p.prioridad === t) op.selected = true;
