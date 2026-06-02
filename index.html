@@ -1398,7 +1398,7 @@ async function renderProgramacion() {
         '<select id="pTaller"><option value="">Seleccionar taller</option>' +
           talleres.map(t => '<option>' + t + '</option>').join('') +
         '</select>' +
-        '<select id="pPrioridad"><option value="Normal">Prioridad Normal</option><option value="Urgente">Urgente</option><option value="Programado">Programado</option></select>' +
+        '<select id="pPrioridad"><option value="Normal">Prioridad Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente</option></select>' +
         '<textarea id="pObs" placeholder="Observaciones adicionales..." rows="2" style="grid-column:1/-1;resize:vertical"></textarea>' +
         '<button class="btn" style="grid-column:1/-1" onclick="guardarProgramacion()">Programar vehículo</button>' +
       '</div>' +
@@ -1535,7 +1535,7 @@ window.editarProg = function(id) {
   const selPrioridad = document.createElement('select');
   selPrioridad.id = 'epPrioridad';
   selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
-  ['Normal','Urgente','Programado'].forEach(function(t) {
+  ['Normal','Alta','Urgente'].forEach(function(t) {
     const op = document.createElement('option');
     op.value = t; op.textContent = t;
     if (p.prioridad === t) op.selected = true;
@@ -1611,9 +1611,10 @@ window.compartirOperaciones = function() {
   pendientes.forEach(function(p) {
     lineas.push('Vehiculo: ' + p.placa + (p.conductor ? ' - ' + p.conductor : ''));
     lineas.push('Fecha estimada: ' + p.fechaEstimada);
+    if (p.horaInicio) lineas.push('Hora: ' + p.horaInicio + (p.horaFin ? ' - ' + p.horaFin : ''));
     lineas.push('Trabajo: ' + p.motivo);
     if (p.taller) lineas.push('Taller: ' + p.taller);
-    if (p.prioridad && p.prioridad !== 'Normal') lineas.push('Prioridad: ' + p.prioridad);
+    if (p.prioridad && p.prioridad !== 'Normal' && p.prioridad !== 'Programado') lineas.push('⚠️ Prioridad: ' + p.prioridad);
     if (p.obs) lineas.push('Obs: ' + p.obs);
     lineas.push('');
   });
@@ -1704,7 +1705,7 @@ window.editarProg = function(id) {
   const selPrioridad = document.createElement('select');
   selPrioridad.id = 'epPrioridad';
   selPrioridad.style.cssText = 'font-size:13px;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);width:100%';
-  ['Normal','Urgente','Programado'].forEach(function(t) {
+  ['Normal','Alta','Urgente'].forEach(function(t) {
     const op = document.createElement('option');
     op.value = t; op.textContent = t;
     if (p.prioridad === t) op.selected = true;
@@ -1778,9 +1779,10 @@ window.compartirOperaciones = function() {
   pendientes.forEach(function(p) {
     lineas2.push('Vehiculo: ' + p.placa + (p.conductor ? ' - ' + p.conductor : ''));
     lineas2.push('Fecha: ' + p.fechaEstimada);
+    if (p.horaInicio) lineas2.push('Hora: ' + p.horaInicio + (p.horaFin ? ' - ' + p.horaFin : ''));
     lineas2.push('Trabajo: ' + p.motivo);
     if (p.taller) lineas2.push('Taller: ' + p.taller);
-    if (p.prioridad && p.prioridad !== 'Normal') lineas2.push('Prioridad: ' + p.prioridad);
+    if (p.prioridad && p.prioridad !== 'Normal' && p.prioridad !== 'Programado') lineas2.push('⚠️ Prioridad: ' + p.prioridad);
     if (p.obs) lineas2.push('Obs: ' + p.obs);
     lineas2.push('');
   });
