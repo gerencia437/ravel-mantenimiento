@@ -135,7 +135,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -532,7 +532,7 @@ function renderView() {
 
   else if (VIEW === 'Km base') { recargarKmBase(); return; }
   else if (VIEW === 'Registro') { recargarYRenderRegistro(); return; }
-  else if (VIEW === 'Historial') c.innerHTML = renderHistorial();
+  else if (VIEW === 'Historial') { recargarYRenderHistorial(); return; }
   else if (VIEW === 'Programación') { renderProgramacion(); return; }
   else if (VIEW === 'Operación') { renderOperacion(); return; }
   else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
@@ -2273,6 +2273,18 @@ window.guardarRegistro = async function() {
 }
 
 // ── HISTORIAL ──
+async function recargarYRenderHistorial() {
+  const c = document.getElementById('content');
+  try {
+    const q = query(collection(db, 'registros'), where('placa', '==', histPlaca));
+    const snap = await getDocs(q);
+    const regsVehiculo = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    registros = registros.filter(r => r.placa !== histPlaca).concat(regsVehiculo);
+  } catch (e) { console.error(e); }
+  c.innerHTML = renderHistorial();
+  bindEvents();
+}
+
 function renderHistorial() {
   const btns = vehiculos.map(v => `<button style="padding:5px 10px;font-size:11px;border-radius:5px;cursor:pointer;border:0.5px solid #ddd;background:${histPlaca===v.placa?'#0F6E56':'#f5f5f0'};color:${histPlaca===v.placa?'#fff':'#666'}" onclick="selHist('${v.placa}')">${v.placa}</button>`).join('');
   const v = vehiculos.find(x => x.placa === histPlaca);
@@ -2330,7 +2342,7 @@ function renderHistorial() {
   ${v && v.km ? `<div class="card"><div class="card-header">Estado mantenimientos — ${histPlaca}</div>${estadoRows}</div>` : ''}`;
 }
 
-window.selHist = function(p) { histPlaca = p; renderView(); }
+window.selHist = async function(p) { histPlaca = p; await recargarYRenderHistorial(); }
 
 
 // ── EXPORTAR EXCEL ──
@@ -2416,10 +2428,8 @@ window.exportarExcel = function() {
 }
 
 window.recargarHistorial = async function() {
-  const rSnap = await getDocs(collection(db, 'registros'));
-  registros = rSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.ts||0)-(a.ts||0));
+  await recargarYRenderHistorial();
   toast('Historial actualizado ✓');
-  renderView();
 }
 
 window.eliminarRegistro = async function(id) {
