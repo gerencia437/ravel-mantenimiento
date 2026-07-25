@@ -220,8 +220,8 @@ let preoperacionales = [];
 // ── USUARIO ACTUAL ──
 let currentUser = null; // { cedula, nombre }
 
-const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores","Usuarios"];
-const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores"];
+const NAVS_SUPERADMIN = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores","Flota","Usuarios"];
+const NAVS_TECNICO = ["Dashboard","Alertas","Preoperacional","Km base","Registro","Historial","Programación","Operación","Informe mensual","Conductores","Flota"];
 const NAVS_CONDUCTOR = ["Preoperacional"];
 
 
@@ -537,6 +537,7 @@ function renderView() {
   else if (VIEW === 'Operación') { renderOperacion(); return; }
   else if (VIEW === 'Informe mensual') c.innerHTML = renderInforme();
   else if (VIEW === 'Conductores') c.innerHTML = renderConductores();
+  else if (VIEW === 'Flota') c.innerHTML = renderFlota();
   bindEvents();
 }
 
@@ -2832,6 +2833,191 @@ window.eliminarUsuario = async function(cedula, nombre) {
   toast('Usuario eliminado ✓');
   renderView();
 }
+
+// ── GESTIÓN DE FLOTA ──
+const TIPOS_VEHICULO = ["Bus","Buseta","Microbus","Campero","Camioneta DC","Van","Otro"];
+const MARCAS_VEHICULO = ["Chevrolet FRR","Chevrolet NPR","Nissan Urvan 3000","Nissan Urvan NV350","New Master","Renault Duster","Renault Duster Oroch","Hino 500","Otro"];
+const INT_OPTIONS = {
+  "Bus (Chevrolet FRR / Hino)": "INT_BUS",
+  "Buseta NPR EXU474": "INT_NPR_EXU",
+  "Buseta NPR NNM607": "INT_NPR_NNM",
+  "Microbus Urvan 3000": "INT_URVAN",
+  "Microbus NV350": "INT_NV350",
+  "New Master": "INT_MASTER",
+  "Duster / Oroch": "INT_DUSTER"
+};
+const INT_MAP = { INT_BUS, INT_NPR_EXU, INT_NPR_NNM, INT_URVAN, INT_NV350, INT_MASTER, INT_DUSTER };
+
+function renderFlota() {
+  const esAdmin = currentUser && (currentUser.rol === 'superadmin' || currentUser.rol === 'tecnico');
+  if (!esAdmin) return '<div class="empty">No tienes permisos para ver esta sección.</div>';
+
+  const tipoColor = { Bus:'#185FA5', Buseta:'#3B6D11', Microbus:'#BA7517', Campero:'#7B3F9E', 'Camioneta DC':'#0F6E56', Van:'#C0392B', Otro:'#888' };
+
+  const floraOrdenada = [...vehiculos].sort((a,b) => a.placa.localeCompare(b.placa));
+
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div class="card-header"><span>Gestión de Flota (' + vehiculos.length + ' vehículos)</span>' +
+    (currentUser.rol === 'superadmin' ?
+      '<button class="btn btn-sm" onclick="abrirModalVehiculo(null)">+ Nuevo vehículo</button>' : '') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:14px">' +
+    floraOrdenada.map(v => {
+      const color = tipoColor[v.tipo] || '#888';
+      return '<div style="border:1px solid #e0e0d8;border-radius:10px;padding:14px;background:#fff">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+          '<div>' +
+            '<div style="font-size:15px;font-weight:700;color:var(--text)">' + v.placa + '</div>' +
+            '<span style="font-size:10px;font-weight:600;background:' + color + '22;color:' + color + ';padding:2px 8px;border-radius:20px">' + (v.tipo||'—') + '</span>' +
+          '</div>' +
+          (currentUser.rol === 'superadmin' ?
+            '<div style="display:flex;gap:6px">' +
+              '<button onclick="abrirModalVehiculo(\'' + v.placa + '\')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #ccc;background:#f5f5f0;cursor:pointer;color:var(--text)">✏️ Editar</button>' +
+              '<button onclick="eliminarVehiculo(\'' + v.placa + '\')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #f0bebe;background:#fff5f5;cursor:pointer;color:var(--red)">🗑️</button>' +
+            '</div>' : '') +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text-muted);line-height:1.8">' +
+          '<div>🚌 <b>' + (v.marca||'—') + '</b> &nbsp;|&nbsp; Modelo <b>' + (v.modelo||'—') + '</b></div>' +
+          '<div>📍 Km actual: <b>' + (v.km ? v.km.toLocaleString('es-CO') + ' km' : 'Sin registro') + '</b></div>' +
+          '<div>👤 ' + (v.conductor||'Sin asignar') + (v.cel && v.cel !== '—' ? ' · ' + v.cel : '') + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('') +
+    '</div></div>' +
+
+    // Modal oculto
+    '<div id="modalFlota" style="display:none;position:fixed;inset:0;background:#0009;z-index:9999;align-items:center;justify-content:center">' +
+    '<div style="background:#fff;border-radius:14px;padding:24px;width:min(480px,96vw);max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px #0004">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">' +
+        '<div style="font-size:15px;font-weight:700" id="modalFlotaTitulo">Nuevo vehículo</div>' +
+        '<button onclick="cerrarModalVehiculo()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888">✕</button>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div style="grid-column:1/-1"><label style="font-size:12px;font-weight:600;color:var(--text-muted)">PLACA *</label>' +
+          '<input id="fPlaca" placeholder="Ej: ABC123" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px"></div>' +
+        '<div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">TIPO *</label>' +
+          '<select id="fTipo" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px">' +
+          TIPOS_VEHICULO.map(t => '<option>' + t + '</option>').join('') + '</select></div>' +
+        '<div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">MARCA</label>' +
+          '<select id="fMarca" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px">' +
+          MARCAS_VEHICULO.map(m => '<option>' + m + '</option>').join('') + '</select></div>' +
+        '<div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">MODELO (AÑO)</label>' +
+          '<input id="fModelo" type="number" placeholder="Ej: 2022" min="1990" max="2030" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px"></div>' +
+        '<div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">KM ACTUAL</label>' +
+          '<input id="fKm" type="number" placeholder="Ej: 150000" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px"></div>' +
+        '<div><label style="font-size:12px;font-weight:600;color:var(--text-muted)">CONDUCTOR</label>' +
+          '<input id="fConductor" placeholder="Nombre conductor" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px"></div>' +
+        '<div style="grid-column:1/-1"><label style="font-size:12px;font-weight:600;color:var(--text-muted)">CELULAR CONDUCTOR</label>' +
+          '<input id="fCel" placeholder="Ej: 300 1234567" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px"></div>' +
+        '<div style="grid-column:1/-1"><label style="font-size:12px;font-weight:600;color:var(--text-muted)">INTERVALOS DE MANTENIMIENTO</label>' +
+          '<select id="fIntervalos" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;margin-top:4px">' +
+          Object.entries(INT_OPTIONS).map(([label, key]) => '<option value="' + key + '">' + label + '</option>').join('') +
+          '</select></div>' +
+      '</div>' +
+      '<div id="fError" style="display:none;color:var(--red);font-size:12px;margin-top:10px;padding:8px 12px;background:#fff5f5;border-radius:6px"></div>' +
+      '<div style="display:flex;gap:8px;margin-top:18px">' +
+        '<button onclick="guardarVehiculo()" class="btn" style="flex:1" id="btnGuardarVehiculo">Guardar vehículo</button>' +
+        '<button onclick="cerrarModalVehiculo()" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;background:#f5f5f0;cursor:pointer;font-weight:600">Cancelar</button>' +
+      '</div>' +
+    '</div></div>';
+}
+
+let _editandoPlaca = null;
+
+window.abrirModalVehiculo = function(placa) {
+  _editandoPlaca = placa;
+  const modal = document.getElementById('modalFlota');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  document.getElementById('fError').style.display = 'none';
+
+  if (placa) {
+    const v = vehiculos.find(x => x.placa === placa);
+    if (!v) return;
+    document.getElementById('modalFlotaTitulo').textContent = 'Editar vehículo · ' + placa;
+    document.getElementById('fPlaca').value = v.placa;
+    document.getElementById('fPlaca').disabled = true;
+    document.getElementById('fTipo').value = v.tipo || TIPOS_VEHICULO[0];
+    document.getElementById('fMarca').value = v.marca || MARCAS_VEHICULO[0];
+    document.getElementById('fModelo').value = v.modelo || '';
+    document.getElementById('fKm').value = v.km || '';
+    document.getElementById('fConductor').value = v.conductor || '';
+    document.getElementById('fCel').value = v.cel || '';
+    // Detectar el intervalo actual
+    const intKey = Object.entries(INT_MAP).find(([k, val]) => JSON.stringify(val) === JSON.stringify(v.int));
+    if (intKey) document.getElementById('fIntervalos').value = intKey[0];
+  } else {
+    document.getElementById('modalFlotaTitulo').textContent = 'Nuevo vehículo';
+    document.getElementById('fPlaca').value = '';
+    document.getElementById('fPlaca').disabled = false;
+    document.getElementById('fTipo').value = TIPOS_VEHICULO[0];
+    document.getElementById('fMarca').value = MARCAS_VEHICULO[0];
+    document.getElementById('fModelo').value = '';
+    document.getElementById('fKm').value = '';
+    document.getElementById('fConductor').value = '';
+    document.getElementById('fCel').value = '';
+    document.getElementById('fIntervalos').value = 'INT_BUS';
+  }
+};
+
+window.cerrarModalVehiculo = function() {
+  const modal = document.getElementById('modalFlota');
+  if (modal) modal.style.display = 'none';
+  _editandoPlaca = null;
+};
+
+window.guardarVehiculo = async function() {
+  const placa = document.getElementById('fPlaca').value.trim().toUpperCase();
+  const tipo = document.getElementById('fTipo').value;
+  const marca = document.getElementById('fMarca').value;
+  const modelo = parseInt(document.getElementById('fModelo').value) || null;
+  const km = parseInt(document.getElementById('fKm').value) || 0;
+  const conductor = document.getElementById('fConductor').value.trim();
+  const cel = document.getElementById('fCel').value.trim() || '—';
+  const intKey = document.getElementById('fIntervalos').value;
+  const int = INT_MAP[intKey] || INT_BUS;
+
+  const errEl = document.getElementById('fError');
+  if (!placa) { errEl.textContent = 'La placa es obligatoria.'; errEl.style.display='block'; return; }
+  if (!/^[A-Z0-9]{5,7}$/.test(placa)) { errEl.textContent = 'La placa debe tener entre 5 y 7 caracteres alfanuméricos (ej: ABC123).'; errEl.style.display='block'; return; }
+  if (!_editandoPlaca && vehiculos.find(v => v.placa === placa)) { errEl.textContent = 'Ya existe un vehículo con esa placa.'; errEl.style.display='block'; return; }
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('btnGuardarVehiculo');
+  btn.textContent = 'Guardando…'; btn.disabled = true;
+
+  try {
+    const datos = { placa, tipo, marca, modelo, km, conductor, cel, int, updatedAt: new Date().toISOString() };
+    await setDoc(doc(db, 'vehiculos', placa), datos, { merge: true });
+
+    if (_editandoPlaca) {
+      const idx = vehiculos.findIndex(v => v.placa === placa);
+      if (idx >= 0) vehiculos[idx] = { ...vehiculos[idx], ...datos };
+    } else {
+      vehiculos.push(datos);
+    }
+
+    cerrarModalVehiculo();
+    toast((_editandoPlaca ? 'Vehículo actualizado' : 'Vehículo creado') + ' ✓');
+    renderView();
+  } catch(e) {
+    errEl.textContent = 'Error al guardar: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Guardar vehículo'; btn.disabled = false;
+  }
+};
+
+window.eliminarVehiculo = async function(placa) {
+  if (!confirm('⚠️ ¿Eliminar el vehículo ' + placa + ' de la flota?\n\nEsto NO borra el historial de mantenimiento, solo lo quita de la lista activa.')) return;
+  try {
+    await deleteDoc(doc(db, 'vehiculos', placa));
+    vehiculos = vehiculos.filter(v => v.placa !== placa);
+    toast('Vehículo ' + placa + ' eliminado de la flota ✓');
+    renderView();
+  } catch(e) {
+    toast('Error al eliminar: ' + e.message);
+  }
+};
 
 function bindEvents() {}
 
